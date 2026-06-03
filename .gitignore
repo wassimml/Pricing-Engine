@@ -1,0 +1,37 @@
+# PDFs du cours (non distribués publiquement)
+TP_Phase1_BlackScholes.pdf
+TP_Vol_Surface_Lab_v2.pdf
+**/TP_Phase1*.pdf
+**/TP_Vol*.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data / fichiers lourds
+*.csv
+*.parquet
+*.h5
+*.hdf5
