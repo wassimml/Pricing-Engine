@@ -10,9 +10,9 @@ Projet personnel conduit en marge d'un cours de produits dérivés (Ensimag 2A),
 
 | Phase | Contenu | Statut |
 |-------|---------|--------|
-| **Phase 1** | Black-Scholes, Greeks & Monte Carlo | 🔄 En cours |
-| **Phase 2** | Volatilité stochastique - Heston & SABR | 🔜 À venir |
-| **Phase 3** | Vol Surface Arbitrage Lab | 🔜 À venir |
+| **Phase 1** | Black-Scholes, Greeks & Monte Carlo | En cours |
+| **Phase 2** | Volatilité stochastique - Heston & SABR | À venir |
+| **Phase 3** | Vol Surface Arbitrage Lab | À venir |
 
 ---
 
@@ -22,7 +22,7 @@ Implémentation des fondations de la valorisation d'options vanilles.
 
 - Modélisation du mouvement brownien géométrique (GBM) et dynamique du sous-jacent
 - Formule analytique Black-Scholes-Merton - calls et puts européens
-- Greeks analytiques : Delta, Gamma, Theta, Vega, Rho
+- Greeks analytiques : Delta, Gamma, Theta, Vega, Rho **(En cours)**
 - Simulation Monte Carlo avec réduction de variance (variables antithétiques)
 - Arbre binomial CRR - options américaines avec exercice anticipé
 - Volatilité implicite par Newton-Raphson
@@ -55,11 +55,16 @@ Analyse de la surface et détection d'incohérences de pricing.
 Options Pricing Engine/
 ├── Phase 1/
 │   ├── src/
-│   │   ├── gbm.py          # Simulation GBM
-│   │   └── pricer.py       # Black-Scholes, Greeks, MC, CRR
-│   └── reports/            # Graphiques générés
-├── Phase 2/                # À venir
-└── Phase 3/                # À venir
+│   │   ├── option.py           # Contrat option (dataclass)
+│   │   ├── pricer.py           # Black-Scholes-Merton
+│   │   ├── greeks.py           # Greeks (Delta, Gamma, Theta, Vega, Rho)
+│   │   ├── gbm.py              # Simulation GBM (MCEngine)
+│   │   ├── deltaHedging.py     # Delta hedging discret
+│   │   └── deltaHedgingMC.py   # Delta hedging Monte Carlo
+│   ├── tests/                  # Tests
+│   └── reports/                # Graphiques générés
+├── Phase 2/                    # À venir
+└── Phase 3/                    # À venir
 ```
 
 ---
