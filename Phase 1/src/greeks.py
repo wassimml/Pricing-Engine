@@ -8,6 +8,7 @@ from option import Option
 REPORTS = Path(__file__).parent.parent / "reports"
 
 TRADING_DAYS = 252
+DAYS_IN_YEAR = 365
 
 class BSGreeks:
     def __init__(self, option: Option):
@@ -35,11 +36,11 @@ class BSGreeks:
         d1 = self._d1(self.opt.S, self.opt.K, self.opt.T, self.opt.r, self.opt.sigma)
         d2 = d1 - self.opt.sigma * np.sqrt(self.opt.T)
         if self.opt.kind == 'call':
-            return (-self.opt.S * norm.pdf(d1) * self.opt.sigma / (2 * np.sqrt(self.opt.T)) 
-                    - self.opt.r * self.opt.K * np.exp(-self.opt.r * self.opt.T) * norm.cdf(d2)) / TRADING_DAYS
+            return ((-self.opt.S * norm.pdf(d1) * self.opt.sigma) / (2 * np.sqrt(self.opt.T)) 
+                    - self.opt.r * self.opt.K * np.exp(-self.opt.r * self.opt.T) * norm.cdf(d2)) / DAYS_IN_YEAR
         else:
             return (-self.opt.S * norm.pdf(d1) * self.opt.sigma / (2 * np.sqrt(self.opt.T)) 
-                    + self.opt.r * self.opt.K * np.exp(-self.opt.r * self.opt.T) * norm.cdf(-d2)) / TRADING_DAYS
+                    + self.opt.r * self.opt.K * np.exp(-self.opt.r * self.opt.T) * norm.cdf(-d2)) / DAYS_IN_YEAR
         
     def rho(self) -> float:
         d1 = self._d1(self.opt.S, self.opt.K, self.opt.T, self.opt.r, self.opt.sigma)
@@ -154,6 +155,8 @@ if __name__ == "__main__":
 
     T_range = np.linspace(0.01, 2, 1000)
     vegas_ATM = [BSGreeks(Option(S=100, K=100, T=t, r=0.05, sigma=0.2, kind='call')).vega() for t in T_range]
+    vegas_ITM = [BSGreeks(Option(S=120, K=100, T=t, r=0.05, sigma=0.2, kind='call')).vega() for t in T_range]
+    vegas_OTM = [BSGreeks(Option(S=80, K=100, T=t, r=0.05, sigma=0.2, kind='call')).vega() for t in T_range]
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
@@ -171,6 +174,8 @@ if __name__ == "__main__":
 
     # --- Plot 2: Vega vs T (ATM) ---
     axes[1].plot(T_range, vegas_ATM, color='purple', lw=2, label='Vega ATM')
+    axes[1].plot(T_range, vegas_ITM, color='green', lw=2, label='Vega ITM (S=120)')
+    axes[1].plot(T_range, vegas_OTM, color='blue', lw=2, label='Vega OTM (S=80)')
     axes[1].axhline(0, color='grey', lw=0.5, ls='--')
     axes[1].set_title('Vega vs Time to Maturity (ATM)')
     axes[1].set_xlabel('Time to Maturity T (years)')
@@ -194,6 +199,8 @@ if __name__ == "__main__":
 
     T_range_theta = np.linspace(0.01, 2, 1000)
     thetas_ATM = [BSGreeks(Option(S=100, K=100, T=t, r=0.05, sigma=0.2, kind='call')).theta() for t in T_range_theta]
+    theta_ITM = [BSGreeks(Option(S=120, K=100, T=t, r=0.05, sigma=0.2, kind='call')).theta() for t in T_range_theta]
+    theta_OTM = [BSGreeks(Option(S=80, K=100, T=t, r=0.05, sigma=0.2, kind='call')).theta() for t in T_range_theta]
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
@@ -211,6 +218,8 @@ if __name__ == "__main__":
 
     # --- Plot 2: Theta vs T (ATM) ---
     axes[1].plot(T_range_theta, thetas_ATM, color='orange', lw=2, label='Theta ATM')
+    axes[1].plot(T_range_theta, theta_ITM, color='green', lw=2, label='Theta ITM (S=120)')
+    axes[1].plot(T_range_theta, theta_OTM, color='blue', lw=2, label='Theta OTM (S=80)')
     axes[1].axhline(0, color='grey', lw=0.5, ls='--')
     axes[1].set_title('Theta vs Time to Maturity (ATM)')
     axes[1].set_xlabel('Time to Maturity T (years)')
@@ -235,6 +244,8 @@ if __name__ == "__main__":
 
     r_range = np.linspace(0, 0.2, 1000)
     rhos_ATM = [BSGreeks(Option(S=100, K=100, T=1, r=r, sigma=0.2, kind='call')).rho() for r in r_range]
+    rhos_ITM = [BSGreeks(Option(S=120, K=100, T=1, r=r, sigma=0.2, kind='call')).rho() for r in r_range]
+    rhos_OTM = [BSGreeks(Option(S=80, K=100, T=1, r=r, sigma=0.2, kind='call')).rho() for r in r_range]
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
@@ -252,6 +263,8 @@ if __name__ == "__main__":
 
     # --- Plot 2: Rho vs r (ATM) ---
     axes[1].plot(r_range * 100, rhos_ATM, color='steelblue', lw=2, label='Rho ATM')
+    axes[1].plot(r_range * 100, rhos_ITM, color='green', lw=2, label='Rho ITM (S=120)')
+    axes[1].plot(r_range * 100, rhos_OTM, color='blue', lw=2, label='Rho OTM (S=80)')
     axes[1].axhline(0, color='grey', lw=0.5, ls='--')
     axes[1].set_title('Rho vs Risk-Free Rate (ATM)')
     axes[1].set_xlabel('Risk-Free Rate r (%)')
