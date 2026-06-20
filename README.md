@@ -54,24 +54,37 @@ Analyse de la surface et détection d'incohérences de pricing.
 Depuis le dossier `Phase 1/` :
 
 ```bash
-python src/pricerTerminal.py --S <spot> --K <strike> --T <maturité> --r <taux> --sigma <vol> --kind <call|put> [--method <méthode>] [--n-paths N] [--seed S]
+python src/pricerTerminal.py --S <spot> --K <strike> --T <maturité> --r <taux> --sigma <vol> --kind <call|put> [--method <méthode>] [--style <european|american>] [--steps N] [--n-paths N] [--seed N]
 ```
 
 **Méthodes disponibles**
 
-| `--method` | Description |
-|---|---|
-| `bs` *(défaut)* | Formule analytique Black-Scholes-Merton |
-| `mc-naive` | Monte Carlo naïf |
-| `mc-antithetic` | Monte Carlo - variables antithétiques |
-| `mc-control` | Monte Carlo - variable de contrôle |
-| `mc-control-antithetic` | Monte Carlo - antithétique + variable de contrôle |
+| `--method` | Description | Style |
+|---|---|---|
+| `bs` *(défaut)* | Formule analytique Black-Scholes-Merton | européen |
+| `binomial` | Arbre binomial CRR | européen / américain |
+| `mc-naive` | Monte Carlo naïf | européen |
+| `mc-antithetic` | Monte Carlo - variables antithétiques | européen |
+| `mc-control` | Monte Carlo - variable de contrôle | européen |
+| `mc-control-antithetic` | Monte Carlo - antithétique + variable de contrôle | européen |
+
+**Flags spécifiques**
+
+| Flag | Défaut | Usage |
+|---|---|---|
+| `--style` | `european` | Style d'exercice pour `binomial` |
+| `--steps` | `100` | Nombre de pas de l'arbre binomial |
+| `--n-paths` | `100000` | Nombre de trajectoires MC |
+| `--seed` | `42` | Seed aléatoire MC |
 
 **Exemples**
 
 ```bash
 # Black-Scholes
 python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind call
+
+# Put américain — arbre binomial, 500 pas
+python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method binomial --style american --steps 500
 
 # Monte Carlo antithétique, 200 000 trajectoires
 python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method mc-antithetic --n-paths 200000
@@ -102,7 +115,10 @@ Options Pricing Engine/
 │   │   ├── greeks.py           # Greeks (Delta, Gamma, Theta, Vega, Rho)
 │   │   ├── gbm.py              # Simulation GBM (MCEngine)
 │   │   ├── deltaHedging.py     # Delta hedging discret
-│   │   └── deltaHedgingMC.py   # Delta hedging Monte Carlo
+│   │   ├── deltaHedgingMC.py   # Delta hedging Monte Carlo
+│   │   ├── monteCarlo.py       # Méthodes Monte Carlo (naïf, antithétique, contrôle)
+│   │   ├── binomial.py         # Arbre binomial CRR (européen / américain)
+│   │   └── pricerTerminal.py   # Interface CLI
 │   ├── tests/                  # Tests
 │   └── reports/                # Graphiques générés
 ├── Phase 2/                    # À venir
