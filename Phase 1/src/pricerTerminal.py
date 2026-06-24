@@ -21,11 +21,15 @@ def parse_args():
         mc-antithetic            Monte Carlo — variables antithétiques
         mc-control               Monte Carlo — variable de contrôle
         mc-control-antithetic    Monte Carlo — antithétique + variable de contrôle
+        mc-lsm                   Monte Carlo Longstaff-Schwartz (américain)
+        pde                      PDE Crank-Nicolson via QuantLib (européen et américain)
 
         exemples:
         python pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind call
         python pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put  --method binomial --style american --steps 500
         python pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind call --method mc-antithetic --n-paths 200000
+        python pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put  --method mc-lsm --style american --steps 50 --n-paths 50000
+        python pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put  --method pde --style american --steps 200 --n-space 200
                 """,
     )
 
@@ -36,16 +40,18 @@ def parse_args():
     parser.add_argument("--sigma",   type=float, required=True, metavar="VOL",    help="Volatilité annualisée (ex: 0.2)")
     parser.add_argument("--kind",    type=str,   required=True, choices=["call", "put"])
     parser.add_argument("--method",  type=str,   default="bs",
-                        choices=["bs", "binomial", "mc-naive", "mc-antithetic", "mc-control", "mc-control-antithetic"],
+                        choices=["bs", "binomial", "mc-naive", "mc-antithetic", "mc-control", "mc-control-antithetic", "mc-lsm", "pde"],
                         help="Méthode de pricing (défaut: bs)")
     parser.add_argument("--style",   type=str,   default="european", choices=["european", "american"],
-                        help="Style d'exercice pour binomial (défaut: european)")
+                        help="Style d'exercice pour binomial, mc-lsm et pde (défaut: european)")
     parser.add_argument("--steps",   type=int,   default=100, metavar="N",
-                        help="Nombre de pas de l'arbre binomial (défaut: 100)")
+                        help="Nombre de pas de temps — binomial, mc-lsm, pde (défaut: 100)")
     parser.add_argument("--n-paths", type=int,   default=100_000, metavar="N",
                         help="Nombre de trajectoires MC (défaut: 100000)")
     parser.add_argument("--seed",    type=int,   default=42,
                         help="Seed aléatoire pour MC (défaut: 42)")
+    parser.add_argument("--n-space", type=int,   default=200, metavar="N",
+                        help="Nombre de pas en espace pour PDE (défaut: 200)")
 
     return parser.parse_args()
 
@@ -82,3 +88,13 @@ if __name__ == "__main__":
         from monteCarlo import mc_control_antithetic
         price = mc_control_antithetic(opt, n_paths=args.n_paths, seed=args.seed)
         print(f"MC Control + Antithetic ({args.kind}, n={args.n_paths:,}): {price:.6f}")
+
+    elif args.method == "mc-lsm":
+        from monteCarloLSM import LSMoptionValue
+        price = LSMoptionValue(opt, n_steps=args.steps, n_paths=args.n_paths, seed=args.seed)
+        print(f"MC LSM ({args.kind}, {args.style}, steps={args.steps}, n={args.n_paths:,}): {price:.6f}")
+
+    elif args.method == "pde":
+        from pde import pde_crank_nicolson
+        price = pde_crank_nicolson(opt, style=args.style, n_steps=args.steps, n_space=args.n_space)
+        print(f"PDE Crank-Nicolson ({args.kind}, {args.style}, steps={args.steps}, space={args.n_space}): {price:.6f}")

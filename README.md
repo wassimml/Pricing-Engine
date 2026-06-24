@@ -23,9 +23,9 @@ Implémentation des fondations de la valorisation d'options vanilles.
 - Modélisation du mouvement brownien géométrique (GBM) et dynamique du sous-jacent
 - Formule analytique Black-Scholes-Merton - calls et puts européens
 - Greeks analytiques : Delta, Gamma, Theta, Vega, Rho 
-- Simulation Monte Carlo avec réduction de variance **(En cours)**
-- Arbre binomial CRR - options américaines avec exercice anticipé
-- Volatilité implicite par Newton-Raphson
+- Simulation Monte Carlo avec réduction de variance 
+- Arbre binomial CRR / Longstaff-Schwartz LSM / PDE - options américaines avec exercice anticipé
+- Volatilité implicite par Newton-Raphson **(En cours)**
 - Benchmark BS / MC / CRR sur données réelles SPY
 
 ## Phase 2 - Volatilité stochastique *(à venir)*
@@ -54,7 +54,7 @@ Analyse de la surface et détection d'incohérences de pricing.
 Depuis le dossier `Phase 1/` :
 
 ```bash
-python src/pricerTerminal.py --S <spot> --K <strike> --T <maturité> --r <taux> --sigma <vol> --kind <call|put> [--method <méthode>] [--style <european|american>] [--steps N] [--n-paths N] [--seed N]
+python src/pricerTerminal.py --S <spot> --K <strike> --T <maturité> --r <taux> --sigma <vol> --kind <call|put> [--method <méthode>] [--style <european|american>] [--steps N] [--n-paths N] [--seed N] [--n-space N]
 ```
 
 **Méthodes disponibles**
@@ -67,15 +67,18 @@ python src/pricerTerminal.py --S <spot> --K <strike> --T <maturité> --r <taux> 
 | `mc-antithetic` | Monte Carlo - variables antithétiques | européen |
 | `mc-control` | Monte Carlo - variable de contrôle | européen |
 | `mc-control-antithetic` | Monte Carlo - antithétique + variable de contrôle | européen |
+| `mc-lsm` | Monte Carlo Longstaff-Schwartz | américain |
+| `pde` | PDE Crank-Nicolson via QuantLib | européen / américain |
 
 **Flags spécifiques**
 
 | Flag | Défaut | Usage |
 |---|---|---|
-| `--style` | `european` | Style d'exercice pour `binomial` |
-| `--steps` | `100` | Nombre de pas de l'arbre binomial |
+| `--style` | `european` | Style d'exercice pour `binomial`, `mc-lsm` et `pde` |
+| `--steps` | `100` | Nombre de pas de temps — binomial, mc-lsm, pde |
 | `--n-paths` | `100000` | Nombre de trajectoires MC |
 | `--seed` | `42` | Seed aléatoire MC |
+| `--n-space` | `200` | Nombre de pas en espace pour `pde` |
 
 **Exemples**
 
@@ -88,6 +91,12 @@ python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind p
 
 # Monte Carlo antithétique, 200 000 trajectoires
 python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method mc-antithetic --n-paths 200000
+
+# Put américain — Longstaff-Schwartz
+python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method mc-lsm --style american --steps 50 --n-paths 50000
+
+# Put américain — PDE Crank-Nicolson
+python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method pde --style american --steps 200 --n-space 200
 ```
 
 ```bash
@@ -117,7 +126,9 @@ Options Pricing Engine/
 │   │   ├── deltaHedging.py     # Delta hedging discret
 │   │   ├── deltaHedgingMC.py   # Delta hedging Monte Carlo
 │   │   ├── monteCarlo.py       # Méthodes Monte Carlo (naïf, antithétique, contrôle)
+│   │   ├── monteCarloLSM.py    # Monte Carlo Longstaff-Schwartz (américain)
 │   │   ├── binomial.py         # Arbre binomial CRR (européen / américain)
+│   │   ├── pde.py              # PDE Crank-Nicolson via QuantLib
 │   │   └── pricerTerminal.py   # Interface CLI
 │   ├── tests/                  # Tests
 │   └── reports/                # Graphiques générés

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from option import Option
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import lognorm
@@ -31,6 +32,15 @@ class MCEngine:
     n_paths: int
     seed: int
 
+    def __init__(self, option: Option, n_steps: int = 252, n_paths: int = 100_000, seed: int = 42):
+        self.S0 = option.S
+        self.mu = option.r
+        self.sigma = option.sigma
+        self.T = option.T
+        self.n_steps = n_steps
+        self.n_paths = n_paths
+        self.seed = seed
+    
     def simulate(self) -> np.ndarray:
         rng = np.random.default_rng(self.seed)
         dt = self.T / self.n_steps
@@ -45,7 +55,8 @@ class MCEngine:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    sim = MCEngine(S0=100, mu=0.08, sigma=0.2, T=1, n_steps=252, n_paths=10_000, seed=56)
+    option = Option(S=100, K=100, T=1, r=0.08, sigma=0.2, kind='call')
+    sim = MCEngine(option, n_steps=252, n_paths=10_000, seed=56)
     simulated_paths = sim.simulate()
     print(simulated_paths)
 
