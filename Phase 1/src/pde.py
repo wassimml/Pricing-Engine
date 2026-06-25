@@ -21,7 +21,7 @@ def pde_crank_nicolson(option: Option, style: str = 'american', n_steps: int = 2
     process = ql.BlackScholesProcess(
         ql.QuoteHandle(ql.SimpleQuote(option.S)),
         ql.YieldTermStructureHandle(ql.FlatForward(today, ql.QuoteHandle(ql.SimpleQuote(option.r)), dc)),
-        ql.BlackVolTermStructureHandle(ql.BlackConstantVol(today, ql.NullCalendar(), ql.QuoteHandle(ql.SimpleQuote(option.sigma)), dc)),
+        ql.BlackVolTermStructureHandle(ql.BlackConstantVol(today, ql.NullCalendar(), ql.QuoteHandle(ql.SimpleQuote(option.sigma)), dc))
     )
 
     payoff_type = ql.Option.Call if option.kind == 'call' else ql.Option.Put
@@ -33,7 +33,8 @@ def pde_crank_nicolson(option: Option, style: str = 'american', n_steps: int = 2
         exercise = ql.EuropeanExercise(maturity)
 
     vanilla = ql.VanillaOption(payoff, exercise)
-    vanilla.setPricingEngine(ql.FdBlackScholesVanillaEngine(process, n_steps, n_space))
+    # FdBlackScholesVanillaEngine uses ql.FdmSchemeDesc.Douglas() per default. 
+    vanilla.setPricingEngine(ql.FdBlackScholesVanillaEngine(process, n_steps, n_space, 2, ql.FdmSchemeDesc.CrankNicolson()))
     return vanilla.NPV()
 
 
