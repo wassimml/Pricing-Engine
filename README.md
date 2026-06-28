@@ -1,115 +1,115 @@
 # Pricing Engine
 
-Moteur de valorisation d'options en Python, développé progressivement en trois phases.
+Python-based options pricing engine, developed incrementally across three phases.
 
-Projet personnel conduit en marge d'un cours de produits dérivés (Ensimag 2A), en appui sur *Options, Futures and Other Derivatives* - John Hull (2024). Développé dans le cadre d'une préparation à une césure.
+Personal project built alongside a derivatives course (Ensimag 2A), drawing on *Options, Futures and Other Derivatives* - John Hull (2024). Developed as part of a gap year preparation.
 
 ---
 
-## Progression
+## Progress
 
-| Phase | Contenu | Statut |
+| Phase | Content | Status |
 |-------|---------|--------|
-| **Phase 1** | Black-Scholes, Greeks & Monte Carlo | En cours |
-| **Phase 2** | Volatilité stochastique - Heston & SABR | À venir |
-| **Phase 3** | Vol Surface Arbitrage Lab | À venir |
+| **Phase 1** | Black-Scholes, Greeks & Monte Carlo | In progress |
+| **Phase 2** | Stochastic Volatility - Heston & SABR | Coming soon |
+| **Phase 3** | Vol Surface Arbitrage Lab | Coming soon |
 
 ---
 
 ## Phase 1 - Black-Scholes, Greeks & Monte Carlo
 
-Implémentation des fondations de la valorisation d'options vanilles.
+Implementation of the foundations of vanilla option pricing.
 
-- Modélisation du mouvement brownien géométrique (GBM) et dynamique du sous-jacent
-- Formule analytique Black-Scholes-Merton - calls et puts européens
-- Greeks analytiques : Delta, Gamma, Theta, Vega, Rho 
-- Simulation Monte Carlo avec réduction de variance 
-- Arbre binomial CRR / Longstaff-Schwartz LSM / PDE - options américaines avec exercice anticipé
-- Volatilité implicite par Newton-Raphson **(En cours)**
-- Benchmark BS / MC / CRR sur données réelles SPY
+- Geometric Brownian motion (GBM) modelling and underlying dynamics
+- Black-Scholes-Merton analytical formula - European calls and puts
+- Analytical Greeks: Delta, Gamma, Theta, Vega, Rho
+- Monte Carlo simulation with variance reduction
+- CRR Binomial tree / Longstaff-Schwartz LSM / PDE - American options with early exercise
+- Implied volatility via Newton-Raphson **(In progress)**
+- BS / MC / CRR benchmark on real SPY data
 
-## Phase 2 - Volatilité stochastique *(à venir)*
+## Phase 2 - Stochastic Volatility *(coming soon)*
 
-Extension vers des modèles à volatilité non constante.
+Extension towards non-constant volatility models.
 
-- Construction de la surface de volatilité implicite
-- Modèle de Heston - pricing par transformée de Fourier (Carr-Madan)
-- Calibration Heston par Differential Evolution
-- Modèle SABR - formule approchée d'Hagan
+- Implied volatility surface construction
+- Heston model - pricing via Fourier transform (Carr-Madan)
+- Heston calibration via Differential Evolution
+- SABR model - Hagan approximation formula
 
-## Phase 3 - Vol Surface Arbitrage Lab *(à venir)*
+## Phase 3 - Vol Surface Arbitrage Lab *(coming soon)*
 
-Analyse de la surface et détection d'incohérences de pricing.
+Surface analysis and detection of pricing inconsistencies.
 
-- Détection d'arbitrage : calendar spread & butterfly
-- Volatilité locale de Dupire
-- Greeks de second ordre : Vanna, Volga, Charm
+- Arbitrage detection: calendar spread & butterfly
+- Dupire local volatility
+- Second-order Greeks: Vanna, Volga, Charm
 - P&L Explain
-- Stress tests et dashboard de synthèse
+- Stress tests and summary dashboard
 
 ---
 
-## Utilisation
+## Usage
 
-Depuis le dossier `Phase 1/` :
+From the `Phase 1/` directory:
 
 ```bash
-python src/pricerTerminal.py --S <spot> --K <strike> --T <maturité> --r <taux> --sigma <vol> --kind <call|put> [--method <méthode>] [--style <european|american>] [--steps N] [--n-paths N] [--seed N] [--n-space N]
+python src/pricerTerminal.py --S <spot> --K <strike> --T <maturity> --r <rate> --sigma <vol> --kind <call|put> [--method <method>] [--style <european|american>] [--steps N] [--n-paths N] [--seed N] [--n-space N]
 ```
 
-**Méthodes disponibles**
+**Available methods**
 
 | `--method` | Description | Style |
 |---|---|---|
-| `bs` *(défaut)* | Formule analytique Black-Scholes-Merton | européen |
-| `binomial` | Arbre binomial CRR | européen / américain |
-| `mc-naive` | Monte Carlo naïf | européen |
-| `mc-antithetic` | Monte Carlo - variables antithétiques | européen |
-| `mc-control` | Monte Carlo - variable de contrôle | européen |
-| `mc-control-antithetic` | Monte Carlo - antithétique + variable de contrôle | européen |
-| `mc-lsm` | Monte Carlo Longstaff-Schwartz | américain |
-| `pde` | PDE Crank-Nicolson via QuantLib | européen / américain |
+| `bs` *(default)* | Black-Scholes-Merton analytical formula | european |
+| `binomial` | CRR binomial tree | european / american |
+| `mc-naive` | Naive Monte Carlo | european |
+| `mc-antithetic` | Monte Carlo - antithetic variates | european |
+| `mc-control` | Monte Carlo - control variate | european |
+| `mc-control-antithetic` | Monte Carlo - antithetic + control variate | european |
+| `mc-lsm` | Longstaff-Schwartz Monte Carlo | american |
+| `pde` | Crank-Nicolson PDE via QuantLib | european / american |
 
-**Flags spécifiques**
+**Specific flags**
 
-| Flag | Défaut | Usage |
+| Flag | Default | Usage |
 |---|---|---|
-| `--style` | `european` | Style d'exercice pour `binomial`, `mc-lsm` et `pde` |
-| `--steps` | `100` | Nombre de pas de temps — binomial, mc-lsm, pde |
-| `--n-paths` | `100000` | Nombre de trajectoires MC |
-| `--seed` | `42` | Seed aléatoire MC |
-| `--n-space` | `200` | Nombre de pas en espace pour `pde` |
+| `--style` | `european` | Exercise style for `binomial`, `mc-lsm` and `pde` |
+| `--steps` | `100` | Number of time steps — binomial, mc-lsm, pde |
+| `--n-paths` | `100000` | Number of MC paths |
+| `--seed` | `42` | MC random seed |
+| `--n-space` | `200` | Number of space steps for `pde` |
 
-**Exemples**
+**Examples**
 
 ```bash
 # Black-Scholes
 python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind call
 
-# Put américain — arbre binomial, 500 pas
+# American put — binomial tree, 500 steps
 python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method binomial --style american --steps 500
 
-# Monte Carlo antithétique, 200 000 trajectoires
+# Antithetic Monte Carlo, 200,000 paths
 python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method mc-antithetic --n-paths 200000
 
-# Put américain — Longstaff-Schwartz
+# American put — Longstaff-Schwartz
 python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method mc-lsm --style american --steps 50 --n-paths 50000
 
-# Put américain — PDE Crank-Nicolson
+# American put — Crank-Nicolson PDE
 python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method pde --style american --steps 200 --n-space 200
 ```
 
 ```bash
-python src/pricerTerminal.py -h   # aide complète
+python src/pricerTerminal.py -h   # full help
 ```
 
 ---
 
 ## Documentation
 
-La documentation du projet est actuellement relativement dense en raison des développements mathématiques nécessaires à la compréhension des modèles de valorisation, des méthodes numériques et des techniques de réduction de variance. Elle sera progressivement restructurée au fur et à mesure de l'avancement du projet afin d'améliorer sa lisibilité.
+The project documentation is currently quite dense due to the mathematical developments required to understand the pricing models, numerical methods, and variance reduction techniques. It will be progressively restructured as the project advances in order to improve readability.
 
-À terme, la documentation sera scindée en plusieurs parties distinctes : une section théorique détaillant les fondements mathématiques et une section plus pratique centrée sur l'implémentation et l'analyse des données du moteur de pricing.
+In time, the documentation will be split into several distinct parts: a theoretical section detailing the mathematical foundations and a more practical section focused on implementation and pricing engine data analysis.
 
 ---
 
@@ -119,23 +119,23 @@ La documentation du projet est actuellement relativement dense en raison des dé
 Options Pricing Engine/
 ├── Phase 1/
 │   ├── src/
-│   │   ├── option.py           # Contrat option (dataclass)
+│   │   ├── option.py           # Option contract (dataclass)
 │   │   ├── pricer.py           # Black-Scholes-Merton
 │   │   ├── greeks.py           # Greeks (Delta, Gamma, Theta, Vega, Rho)
-│   │   ├── gbm.py              # Simulation GBM (MCEngine)
-│   │   ├── deltaHedging.py     # Delta hedging discret
-│   │   ├── deltaHedgingMC.py   # Delta hedging Monte Carlo
-│   │   ├── monteCarlo.py       # Méthodes Monte Carlo (naïf, antithétique, contrôle)
-│   │   ├── monteCarloLSM.py    # Monte Carlo Longstaff-Schwartz (américain)
-│   │   ├── binomial.py         # Arbre binomial CRR (européen / américain)
-│   │   ├── pde.py              # PDE Crank-Nicolson via QuantLib
-│   │   └── pricerTerminal.py   # Interface CLI
+│   │   ├── gbm.py              # GBM simulation (MCEngine)
+│   │   ├── deltaHedging.py     # Discrete delta hedging
+│   │   ├── deltaHedgingMC.py   # Monte Carlo delta hedging
+│   │   ├── monteCarlo.py       # Monte Carlo methods (naive, antithetic, control)
+│   │   ├── monteCarloLSM.py    # Longstaff-Schwartz Monte Carlo (american)
+│   │   ├── binomial.py         # CRR binomial tree (european / american)
+│   │   ├── pde.py              # Crank-Nicolson PDE via QuantLib
+│   │   └── pricerTerminal.py   # CLI interface
 │   ├── tests/                  # Tests
-│   └── reports/                # Graphiques générés
-├── Phase 2/                    # À venir
-└── Phase 3/                    # À venir
+│   └── reports/                # Generated charts
+├── Phase 2/                    # Coming soon
+└── Phase 3/                    # Coming soon
 ```
 
 ---
 
-*Projet en cours de développement - les phases 2 et 3 seront implémentées progressivement.*
+*Project under active development - phases 2 and 3 will be implemented incrementally.*

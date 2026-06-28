@@ -98,7 +98,7 @@ def print_tree_visual(tree, calc_tree, S_tree, p, disc, period, option, american
 
 
 if __name__ == "__main__":
-    option = Option(S=100, K=100, T=1, r=0.05, sigma=0.2, kind="call")
+    option = Option(S=100, K=100, T=1, r=0.05, sigma=0.2, kind="put")
     period = 3
     import time
     start = time.perf_counter()
