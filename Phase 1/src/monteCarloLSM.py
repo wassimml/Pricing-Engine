@@ -42,18 +42,24 @@ def LSMoptionValue(option, n_steps=50, n_paths=4096, seed=42):
 
         V[t, :] = V[t + 1, :] * df  # par défaut : continuation pour tous
 
-        if np.sum(itm) > 0:
-            S_itm = S_t[itm]
-            S_mean, S_std = S_itm.mean(), S_itm.std()
-            S_norm = (S_itm - S_mean) / S_std
+        if np.sum(itm) < 10:  # trop peu de chemins ITM pour la régression
+            continue
 
-            rg = np.polyfit(S_norm, V[t + 1, itm] * df, 5)
-            C = np.polyval(rg, S_norm)
+        S_itm = S_t[itm]
+        S_mean, S_std = S_itm.mean(), S_itm.std()
 
-            exercise = h_t[itm] > C
-            idx_itm = np.where(itm)[0]
-            idx_exercise = idx_itm[exercise]
-            V[t, idx_exercise] = h_t[idx_exercise]
+        if S_std < 1e-10:  # cas dégénéré : tous les chemins ITM au même niveau
+            continue
+
+        S_norm = (S_itm - S_mean) / S_std
+
+        rg = np.polyfit(S_norm, V[t + 1, itm] * df, 3)  # degré 3, standard LSM
+        C  = np.polyval(rg, S_norm)
+
+        exercise     = h_t[itm] > C
+        idx_itm      = np.where(itm)[0]
+        idx_exercise = idx_itm[exercise]
+        V[t, idx_exercise] = h_t[idx_exercise]
 
     V0 = np.sum(V[1, :] * df) / n_paths  # LSM estimator
     return V0

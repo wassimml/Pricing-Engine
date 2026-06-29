@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 from option import Option
-from pricer import BSModel
+from BSpricer import BSModel
 
 REPORTS = Path(__file__).parent.parent / "reports"
 

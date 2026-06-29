@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from option import Option
-from pricer import BSModel
+from BSpricer import BSModel
 
 
 def parse_args():

@@ -6,7 +6,7 @@ from pathlib import Path
 import yfinance as yf
 from datetime import datetime
 
-from pricer import BSModel
+from BSpricer import BSModel
 from option import Option
 
 REPORTS = Path(__file__).parent.parent / "reports"

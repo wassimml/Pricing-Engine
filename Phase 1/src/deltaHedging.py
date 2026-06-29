@@ -3,7 +3,7 @@ import numpy as np
 
 from option import Option
 from greeks import BSGreeks
-from pricer import BSModel
+from BSpricer import BSModel
 
 if __name__ == "__main__":
     # Values for the option and market parameters

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from option import Option
 from greeks import BSGreeks
-from pricer import BSModel
+from BSpricer import BSModel
 
 
 REPORTS = Path(__file__).parent.parent / "reports"
