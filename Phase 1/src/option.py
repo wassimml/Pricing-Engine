@@ -11,6 +11,10 @@ class Option:
     kind: str     # 'call' or 'put'
 
     def __post_init__(self):
+        if self.S <= 0:
+            raise ValueError(f"S must be > 0, got {self.S}")
+        if self.K <= 0:
+            raise ValueError(f"K must be > 0, got {self.K}")
         if self.T <= 0:
             raise ValueError(f"T must be > 0, got {self.T}")
         if self.sigma <= 0:

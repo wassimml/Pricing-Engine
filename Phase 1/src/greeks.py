@@ -7,48 +7,54 @@ from option import Option
 
 REPORTS = Path(__file__).parent.parent / "reports"
 
-TRADING_DAYS = 252
+# T is in calendar years → theta is per calendar day (÷365).
+# Use ÷252 only if you want theta per trading day.
 DAYS_IN_YEAR = 365
 
 class BSGreeks:
     def __init__(self, option: Option):
         self.opt = option
 
-    @staticmethod
-    def _d1(S, K, T, r, sigma):
-        return (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    def _d1_d2(self):
+        o = self.opt
+        d1 = (np.log(o.S / o.K) + (o.r + 0.5 * o.sigma ** 2) * o.T) / (o.sigma * np.sqrt(o.T))
+        d2 = d1 - o.sigma * np.sqrt(o.T)
+        return d1, d2
 
     def delta(self) -> float:
-        d1 = self._d1(self.opt.S, self.opt.K, self.opt.T, self.opt.r, self.opt.sigma)
+        d1, _ = self._d1_d2()
         if self.opt.kind == 'call':
             return float(norm.cdf(d1))
         return float(norm.cdf(d1) - 1)
 
     def gamma(self) -> float:
-        d1 = self._d1(self.opt.S, self.opt.K, self.opt.T, self.opt.r, self.opt.sigma)
+        d1, _ = self._d1_d2()
         return norm.pdf(d1) / (self.opt.S * self.opt.sigma * np.sqrt(self.opt.T))
-    
+
     def vega(self) -> float:
-        d1 = self._d1(self.opt.S, self.opt.K, self.opt.T, self.opt.r, self.opt.sigma)
-        return self.opt.S * norm.pdf(d1) * np.sqrt(self.opt.T) / 100  # Vega per 1% change in volatility
-    
+        # Raw ∂V/∂σ — sigma is in decimal (0.2 = 20%), so this is per unit of σ.
+        # Do NOT divide by 100: delta/gamma/theta use the same raw-derivative convention,
+        # and dividing here would break hedging calculations by a factor of 100.
+        d1, _ = self._d1_d2()
+        return self.opt.S * norm.pdf(d1) * np.sqrt(self.opt.T)
+
     def theta(self) -> float:
-        d1 = self._d1(self.opt.S, self.opt.K, self.opt.T, self.opt.r, self.opt.sigma)
-        d2 = d1 - self.opt.sigma * np.sqrt(self.opt.T)
+        d1, d2 = self._d1_d2()
         if self.opt.kind == 'call':
-            return ((-self.opt.S * norm.pdf(d1) * self.opt.sigma) / (2 * np.sqrt(self.opt.T)) 
+            return ((-self.opt.S * norm.pdf(d1) * self.opt.sigma) / (2 * np.sqrt(self.opt.T))
                     - self.opt.r * self.opt.K * np.exp(-self.opt.r * self.opt.T) * norm.cdf(d2)) / DAYS_IN_YEAR
         else:
-            return (-self.opt.S * norm.pdf(d1) * self.opt.sigma / (2 * np.sqrt(self.opt.T)) 
+            return (-self.opt.S * norm.pdf(d1) * self.opt.sigma / (2 * np.sqrt(self.opt.T))
                     + self.opt.r * self.opt.K * np.exp(-self.opt.r * self.opt.T) * norm.cdf(-d2)) / DAYS_IN_YEAR
-        
+
     def rho(self) -> float:
-        d1 = self._d1(self.opt.S, self.opt.K, self.opt.T, self.opt.r, self.opt.sigma)
-        d2 = d1 - self.opt.sigma * np.sqrt(self.opt.T)
+        # Raw ∂V/∂r — r is in decimal (0.05 = 5%), so this is per unit of r.
+        # Do NOT divide by 100: same raw-derivative convention as all other Greeks.
+        _, d2 = self._d1_d2()
         if self.opt.kind == 'call':
-            return self.opt.K * self.opt.T * np.exp(-self.opt.r * self.opt.T) * norm.cdf(d2) / 100  # Rho per 1% change in rate
+            return self.opt.K * self.opt.T * np.exp(-self.opt.r * self.opt.T) * norm.cdf(d2)
         else:
-            return -self.opt.K * self.opt.T * np.exp(-self.opt.r * self.opt.T) * norm.cdf(-d2) / 100
+            return -self.opt.K * self.opt.T * np.exp(-self.opt.r * self.opt.T) * norm.cdf(-d2)
 
 if __name__ == "__main__":
     opt_call = Option(S=100, K=100, T=1, r=0.05, sigma=0.2, kind='call')

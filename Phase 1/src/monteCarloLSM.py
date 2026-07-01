@@ -11,7 +11,7 @@ REPORTS = Path(__file__).parent.parent / "reports"
 
 
 def LSMoptionValue(option, n_steps=50, n_paths=4096, seed=42):
-    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
     dt = option.T / n_steps  # time interval
     df = np.exp(-option.r * dt)  # discount factor per time time interval
 
@@ -19,7 +19,7 @@ def LSMoptionValue(option, n_steps=50, n_paths=4096, seed=42):
     S = np.zeros((n_steps + 1, n_paths), 'd')  # stock price matrix
     S[0, :] = option.S  # initial values for stock price
     for t in range(1, n_steps + 1):
-        ran = np.random.standard_normal(int(n_paths / 2))
+        ran = rng.standard_normal(int(n_paths / 2))
         ran = np.concatenate((ran, -ran))  # antithetic variates
         ran = ran - np.mean(ran)  # correct first moment
         ran = ran / np.std(ran)  # correct second moment

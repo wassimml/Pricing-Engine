@@ -1,4 +1,3 @@
-from scipy.stats import norm
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
@@ -8,84 +7,68 @@ from BSpricer import BSModel
 
 REPORTS = Path(__file__).parent.parent / "reports"
 
-def mc_naive(opt : Option, n_paths : int = 100000) -> float:
+def mc_naive(opt : Option, n_paths : int = 100000, seed : int = 42) -> float:
     """Monte Carlo pricer for European vanilla options."""
-    # Simulate terminal spot price
-    S_T = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T + opt.sigma * np.sqrt(opt.T) * norm.rvs(size=n_paths))
-    # Compute payoff and discount
+    rng = np.random.default_rng(seed)
+    s_t = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T + opt.sigma * np.sqrt(opt.T) * rng.standard_normal(n_paths))
     if opt.kind == 'call':
-        Discounted_payoff =np.exp(-opt.r * opt.T) * np.maximum(S_T - opt.K, 0)
+        discounted_payoff = np.exp(-opt.r * opt.T) * np.maximum(s_t - opt.K, 0)
     else:
-        Discounted_payoff = np.exp(-opt.r * opt.T) * np.maximum(opt.K - S_T, 0)
-    return float(np.mean(Discounted_payoff)), np.std(Discounted_payoff)/ np.sqrt(n_paths)
+        discounted_payoff = np.exp(-opt.r * opt.T) * np.maximum(opt.K - s_t, 0)
+    return float(np.mean(discounted_payoff)), np.std(discounted_payoff) / np.sqrt(n_paths)
 
 
-def mc_antithetic(opt : Option, n_paths : int = 100000) -> float:
+def mc_antithetic(opt : Option, n_paths : int = 100000, seed : int = 42) -> float:
     """Monte Carlo pricer with antithetic variates."""
-    # Simulate terminal spot price
-    Z = norm.rvs(size=n_paths//2)
-    S_T1 = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T + opt.sigma * np.sqrt(opt.T) * Z)
-    S_T2 = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T - opt.sigma * np.sqrt(opt.T) * Z)
-    # Compute payoff and discount
+    rng = np.random.default_rng(seed)
+    z = rng.standard_normal(n_paths // 2)
+    s_t1 = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T + opt.sigma * np.sqrt(opt.T) * z)
+    s_t2 = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T - opt.sigma * np.sqrt(opt.T) * z)
     if opt.kind == 'call':
-        Payoff1 = np.maximum(S_T1 - opt.K, 0)
-        Payoff2 = np.maximum(S_T2 - opt.K, 0)
+        payoff1 = np.maximum(s_t1 - opt.K, 0)
+        payoff2 = np.maximum(s_t2 - opt.K, 0)
     else:
-        Payoff1 = np.maximum(opt.K - S_T1, 0)
-        Payoff2 = np.maximum(opt.K - S_T2, 0)
-    Discounted_payoff = np.exp(-opt.r * opt.T) * (Payoff1 + Payoff2) / 2
-    return float(np.mean(Discounted_payoff)), np.std(Discounted_payoff)/ np.sqrt(n_paths)
+        payoff1 = np.maximum(opt.K - s_t1, 0)
+        payoff2 = np.maximum(opt.K - s_t2, 0)
+    discounted_payoff = np.exp(-opt.r * opt.T) * (payoff1 + payoff2) / 2
+    # n_paths//2 independent pairs — not n_paths (pairs are correlated)
+    return float(np.mean(discounted_payoff)), np.std(discounted_payoff) / np.sqrt(n_paths // 2)
 
-def mc_control(opt : Option, n_paths : int = 100000) -> float:
+
+def mc_control(opt : Option, n_paths : int = 100000, seed : int = 42) -> float:
     """Monte Carlo pricer with control variates."""
-    # Simulate terminal spot price
-    S_T = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T + opt.sigma * np.sqrt(opt.T) * norm.rvs(size=n_paths))
-    # Compute payoff and discount
+    rng = np.random.default_rng(seed)
+    s_t = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T + opt.sigma * np.sqrt(opt.T) * rng.standard_normal(n_paths))
     if opt.kind == 'call':
-        Payoff = np.maximum(S_T - opt.K, 0)
-        Control = S_T
-        Control_mean = opt.S  
+        payoff = np.maximum(s_t - opt.K, 0)
     else:
-        Payoff = np.maximum(opt.K - S_T, 0)
-        Control = S_T
-        Control_mean = opt.S
-    # Compute control variate coefficient
-    cov = np.cov(Payoff, Control)[0][1]
-    var_control = np.var(Control)
-    beta = cov / var_control if var_control > 0 else 0
-    # Adjust payoff with control variate
-    Discounted_Adjusted_payoff = np.exp(-opt.r * opt.T) * Payoff - beta * (np.exp(-opt.r * opt.T) * Control - Control_mean)
-    return float(np.mean(Discounted_Adjusted_payoff)), np.std(Discounted_Adjusted_payoff)/ np.sqrt(n_paths)
+        payoff = np.maximum(opt.K - s_t, 0)
+    beta = np.cov(payoff, s_t)[0, 1] / np.var(s_t)
+    adjusted = payoff - beta * (s_t - opt.S * np.exp(opt.r * opt.T))
+    price = np.exp(-opt.r * opt.T) * np.mean(adjusted)
+    std_error = np.exp(-opt.r * opt.T) * np.std(adjusted) / np.sqrt(n_paths)
+    return float(price), std_error
 
 
-def mc_control_antithetic(opt : Option, n_paths : int = 100000) -> float:
+def mc_control_antithetic(opt : Option, n_paths : int = 100000, seed : int = 42) -> float:
     """Monte Carlo pricer with control variates and antithetic variates."""
-    # Simulate terminal spot price
-    Z = norm.rvs(size=n_paths//2)
-    S_T1 = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T + opt.sigma * np.sqrt(opt.T) * Z)
-    S_T2 = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T - opt.sigma * np.sqrt(opt.T) * Z)
-    # Compute payoff and discount
+    rng = np.random.default_rng(seed)
+    z = rng.standard_normal(n_paths // 2)
+    s_t1 = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T + opt.sigma * np.sqrt(opt.T) * z)
+    s_t2 = opt.S * np.exp((opt.r - 0.5 * opt.sigma ** 2) * opt.T - opt.sigma * np.sqrt(opt.T) * z)
     if opt.kind == 'call':
-        Payoff1 = np.maximum(S_T1 - opt.K, 0)
-        Payoff2 = np.maximum(S_T2 - opt.K, 0)
-        Control1 = S_T1
-        Control2 = S_T2
-        Control_mean = opt.S  
+        payoff1 = np.maximum(s_t1 - opt.K, 0)
+        payoff2 = np.maximum(s_t2 - opt.K, 0)
     else:
-        Payoff1 = np.maximum(opt.K - S_T1, 0)
-        Payoff2 = np.maximum(opt.K - S_T2, 0)
-        Control1 = S_T1
-        Control2 = S_T2
-        Control_mean = opt.S
-    # Compute control variate coefficient
-    Payoff_combined = (Payoff1 + Payoff2) / 2
-    Control_combined = (Control1 + Control2) / 2
-    cov = np.cov(Payoff_combined, Control_combined)[0][1]
-    var_control = np.var(Control_combined)
-    beta = cov / var_control if var_control > 0 else 0
-    # Adjust payoff with control variate
-    Discounted_Adjusted_payoff = np.exp(-opt.r * opt.T) * Payoff_combined - beta * (np.exp(-opt.r * opt.T) * Control_combined - Control_mean)
-    return float(np.mean(Discounted_Adjusted_payoff)), np.std(Discounted_Adjusted_payoff)/ np.sqrt(n_paths)
+        payoff1 = np.maximum(opt.K - s_t1, 0)
+        payoff2 = np.maximum(opt.K - s_t2, 0)
+    payoff_combined = (payoff1 + payoff2) / 2
+    control_combined = (s_t1 + s_t2) / 2
+    control_mean = opt.S
+    beta = np.cov(payoff_combined, control_combined)[0][1] / np.var(control_combined)
+    discounted_adjusted = np.exp(-opt.r * opt.T) * payoff_combined - beta * (np.exp(-opt.r * opt.T) * control_combined - control_mean)
+    # n_paths//2 independent pairs — not n_paths (pairs are correlated)
+    return float(np.mean(discounted_adjusted)), np.std(discounted_adjusted) / np.sqrt(n_paths // 2)
 
 if __name__ == "__main__":
     opt = Option(S=100, K=100, T=1, r=0.05, sigma=0.2, kind='call')

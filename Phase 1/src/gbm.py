@@ -22,6 +22,9 @@ class MCEngine:
     simulate() returns an array of shape (n_paths, n_steps + 1).
     Column 0 is the initial price S0; subsequent columns are the simulated path.
     Fully vectorised — no Python loop over time steps.
+
+    mu defaults to option.r (risk-neutral drift under Q).
+    Pass an explicit mu to simulate under the real-world measure P (e.g. for P&L analysis).
     """
 
     S0: float
@@ -32,15 +35,16 @@ class MCEngine:
     n_paths: int
     seed: int
 
-    def __init__(self, option: Option, n_steps: int = 252, n_paths: int = 100_000, seed: int = 42):
+    def __init__(self, option: Option, n_steps: int = 252, n_paths: int = 100_000,
+                 seed: int = 42, mu: float = None):
         self.S0 = option.S
-        self.mu = option.r
+        self.mu = mu if mu is not None else option.r  # risk-neutral by default
         self.sigma = option.sigma
         self.T = option.T
         self.n_steps = n_steps
         self.n_paths = n_paths
         self.seed = seed
-    
+
     def simulate(self) -> np.ndarray:
         rng = np.random.default_rng(self.seed)
         dt = self.T / self.n_steps

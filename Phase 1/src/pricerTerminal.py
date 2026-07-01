@@ -65,8 +65,8 @@ if __name__ == "__main__":
         print(f"BS Price ({args.kind}): {price:.6f}")
 
     elif args.method == "binomial":
-        from binomial import binomial_price
-        price = binomial_price(opt, n_steps=args.steps, style=args.style)
+        from binomial import crr_price
+        price = crr_price(opt, period=args.steps, american=(args.style == 'american'))
         print(f"Binomial CRR ({args.kind}, {args.style}, N={args.steps}): {price:.6f}")
 
     elif args.method == "mc-naive":

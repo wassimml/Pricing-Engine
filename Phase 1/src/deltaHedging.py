@@ -26,7 +26,8 @@ if __name__ == "__main__":
     print("-" * 85)
 
     # Simulate the stock price path using GBM
-    Z = np.random.normal(0, 1, T_weeks)
+    rng = np.random.default_rng(42)
+    Z = rng.standard_normal(T_weeks)
     S = np.zeros(T_weeks + 1)
     S[0] = S0
     for t in range(1, T_weeks + 1):

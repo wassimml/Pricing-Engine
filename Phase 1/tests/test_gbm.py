@@ -1,11 +1,19 @@
 import numpy as np
 from scipy import stats
+from option import Option
 from gbm import MCEngine
 
 
 def make_engine(**kw):
-    defaults = dict(S0=100, mu=0.08, sigma=0.2, T=1, n_steps=252, n_paths=50_000, seed=0)
-    return MCEngine(**{**defaults, **kw})
+    S0     = kw.pop('S0', 100)
+    mu     = kw.pop('mu', 0.08)
+    sigma  = kw.pop('sigma', 0.2)
+    T      = kw.pop('T', 1)
+    n_steps = kw.pop('n_steps', 252)
+    n_paths = kw.pop('n_paths', 50_000)
+    seed   = kw.pop('seed', 0)
+    opt = Option(S=S0, K=100, T=T, r=mu, sigma=sigma, kind='call')
+    return MCEngine(opt, n_steps=n_steps, n_paths=n_paths, seed=seed)
 
 
 # --- Shape et valeurs de base ---

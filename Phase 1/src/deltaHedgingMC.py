@@ -23,7 +23,7 @@ def simulate_delta_hedging_mc(
     seed: int = 42
 ) -> pd.DataFrame:
 
-    np.random.seed(seed)
+    rng = np.random.default_rng(seed)
 
     if rebalancing == 'weekly':
         dt = 1 / 52
@@ -41,7 +41,7 @@ def simulate_delta_hedging_mc(
 
     for sim in range(n_simulations):
         # Simulation GBM
-        Z = np.random.normal(0, 1, n_steps)
+        Z = rng.standard_normal(n_steps)
         S = np.zeros(n_steps + 1)
         S[0] = S0
         for t in range(1, n_steps + 1):

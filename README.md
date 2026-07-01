@@ -25,8 +25,8 @@ Implementation of the foundations of vanilla option pricing.
 - Analytical Greeks: Delta, Gamma, Theta, Vega, Rho
 - Monte Carlo simulation with variance reduction
 - CRR Binomial tree / Longstaff-Schwartz LSM / PDE - American options with early exercise
-- Implied volatility via Newton-Raphson **(In progress)**
-- BS / MC / CRR benchmark on real SPY data
+- Implied volatility via Newton-Raphson 
+- BS / MC / CRR benchmark on real SPY data **(In progress)**
 
 ## Phase 2 - Stochastic Volatility *(coming soon)*
 
@@ -107,9 +107,10 @@ python src/pricerTerminal.py -h   # full help
 
 ## Documentation
 
-The project documentation is currently quite dense due to the mathematical developments required to understand the pricing models, numerical methods, and variance reduction techniques. It will be progressively restructured as the project advances in order to improve readability.
+The Phase 1 documentation is split into two distinct documents:
 
-In time, the documentation will be split into several distinct parts: a theoretical section detailing the mathematical foundations and a more practical section focused on implementation and pricing engine data analysis.
+- **[Pricing d'Options - Théorie, Méthodes et Démonstrations](Phase%201/Pricing%20d'Options%20-%20Théorie%2C%20Méthodes%20et%20Démonstrations.pdf)** — theoretical report covering the mathematical foundations of each method (Black-Scholes, Greeks, Monte Carlo and variance reduction, CRR binomial tree, Longstaff-Schwartz, PDE/Crank-Nicolson, implied volatility and volatility surface), with proofs and numerical examples.
+- **[Pricing d'Options - Benchmark des Méthodes](Phase%201/Pricing%20d'Options%20-%20Benchmark%20des%20Méthodes.pdf)** — practical document benchmarking all methods against each other on a large set of options (~2000), then against real market data from a liquid underlying (SPY).
 
 ---
 
@@ -120,7 +121,7 @@ Options Pricing Engine/
 ├── Phase 1/
 │   ├── src/
 │   │   ├── option.py           # Option contract (dataclass)
-│   │   ├── pricer.py           # Black-Scholes-Merton
+│   │   ├── BSpricer.py         # Black-Scholes-Merton
 │   │   ├── greeks.py           # Greeks (Delta, Gamma, Theta, Vega, Rho)
 │   │   ├── gbm.py              # GBM simulation (MCEngine)
 │   │   ├── deltaHedging.py     # Discrete delta hedging
@@ -129,7 +130,8 @@ Options Pricing Engine/
 │   │   ├── monteCarloLSM.py    # Longstaff-Schwartz Monte Carlo (american)
 │   │   ├── binomial.py         # CRR binomial tree (european / american)
 │   │   ├── pde.py              # Crank-Nicolson PDE via QuantLib
-│   │   └── pricerTerminal.py   # CLI interface
+│   │   ├── pricerTerminal.py   # CLI interface
+│   │   └── benchmark.py        # Benchmark all methods on ~2000 real options
 │   ├── tests/                  # Tests
 │   └── reports/                # Generated charts
 ├── Phase 2/                    # Coming soon

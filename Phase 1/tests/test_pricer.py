@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from option import Option
-from pricer import BSModel
+from BSpricer import BSModel
 
 model = BSModel()
 
@@ -27,13 +27,13 @@ def test_put_call_parity():
 # --- Cas limites en S ---
 
 def test_call_S_near_zero():
-    # S→0 : call→0
-    assert model.price(call(S=1e-6)) < 1e-4
+    # S≤0 now raises at construction — NaN would silently propagate into BS
+    with pytest.raises(ValueError):
+        call(S=0)
 
 def test_put_S_near_zero():
-    # S→0 : put→K·e^{-rT}
-    opt = put(S=1e-6)
-    assert abs(model.price(opt) - opt.K * np.exp(-opt.r * opt.T)) < 1e-4
+    with pytest.raises(ValueError):
+        put(S=-1)
 
 def test_call_S_large():
     # S→∞ : call→S - K·e^{-rT}
@@ -74,9 +74,9 @@ def test_call_sigma_near_zero_otm():
 # --- Cas K=0 ---
 
 def test_call_K_near_zero():
-    # K→0 : call→S (pas de strike = détenir l'action)
-    opt = call(K=1e-4)
-    assert abs(model.price(opt) - opt.S) < 0.01
+    # K≤0 now raises at construction
+    with pytest.raises(ValueError):
+        call(K=0)
 
 
 # --- Cas r=0, σ→0 ---

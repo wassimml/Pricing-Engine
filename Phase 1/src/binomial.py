@@ -1,6 +1,7 @@
 import numpy as np
-from option import Option
+import time
 
+from option import Option
 
 def crr_price(option: Option, period: int, american: bool = False, verbose: bool = False) -> float:
     dt = option.T / period
@@ -100,7 +101,7 @@ def print_tree_visual(tree, calc_tree, S_tree, p, disc, period, option, american
 if __name__ == "__main__":
     option = Option(S=100, K=100, T=1, r=0.05, sigma=0.2, kind="put")
     period = 3
-    import time
+    
     start = time.perf_counter()
     price_eu = crr_price(option, period, american=False, verbose=True)
     price_us = crr_price(option, period, american=True, verbose=True)
