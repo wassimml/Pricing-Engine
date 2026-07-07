@@ -1,6 +1,6 @@
 # Pricing Engine
 
-Moteur de valorisation d'options en Python, développé progressivement en trois phases.
+Moteur de valorisation d'options en Python, développé progressivement en quatre phases.
 
 Projet personnel conduit en marge d'un cours de produits dérivés (Ensimag 2A), en appui sur *Options, Futures and Other Derivatives* - John Hull (2024). Développé dans le cadre d'une préparation à une césure.
 
@@ -12,7 +12,8 @@ Projet personnel conduit en marge d'un cours de produits dérivés (Ensimag 2A),
 |-------|---------|--------|
 | **Phase 1** | Black-Scholes, Greeks & Monte Carlo | En cours |
 | **Phase 2** | Volatilité stochastique - Heston & SABR | À venir |
-| **Phase 3** | Vol Surface Arbitrage Lab | À venir |
+| **Phase 3** | Taux d'intérêt stochastique - Vasicek, CIR & SVSI | À venir |
+| **Phase 4** | Vol Surface Arbitrage Lab | À venir |
 
 ---
 
@@ -32,20 +33,30 @@ Implémentation des fondations de la valorisation d'options vanilles.
 
 Extension vers des modèles à volatilité non constante.
 
-- Construction de la surface de volatilité implicite
-- Modèle de Heston - pricing par transformée de Fourier (Carr-Madan)
-- Calibration Heston par Differential Evolution
-- Modèle SABR - formule approchée d'Hagan
+- 2.1 Surface de volatilité implicite
+- 2.2 Modèle de Heston - Carr-Madan pricing
+- 2.3 Calibration Heston - Differential evolution
+- 2.4 Modèle SABR - Formule d'Hagan
+- 2.5 Confrontation au marché réel (SPY) : réduction de l'écart vs Phase 1
 
-## Phase 3 - Vol Surface Arbitrage Lab *(à venir)*
+## Phase 3 - Taux d'intérêt stochastique *(à venir)*
+
+Modélisation de la structure par termes des taux et couplage avec le sous-jacent.
+
+- 3.1 Modèle de Vasicek : taux stochastique mean-reverting
+- 3.2 Modèle Cox-Ingersoll-Ross (CIR)
+- 3.3 Couplage taux/sous-jacent : modèle SVSI
+- 3.4 Confrontation au marché réel : options longue maturité
+
+## Phase 4 - Vol Surface Arbitrage Lab *(à venir)*
 
 Analyse de la surface et détection d'incohérences de pricing.
 
-- Détection d'arbitrage : calendar spread & butterfly
-- Volatilité locale de Dupire
-- Greeks de second ordre : Vanna, Volga, Charm
-- P&L Explain
-- Stress tests et dashboard de synthèse
+- 4.1 Absence d'arbitrage - Détection calendar & butterfly
+- 4.2 Volatilité locale de Dupire
+- 4.3 Greeks de second ordre - Vanna, Volga, Charm
+- 4.4 P&L Explain
+- 4.5 Stress tests + dashboard final
 
 ---
 
@@ -135,9 +146,10 @@ Options Pricing Engine/
 │   ├── tests/                  # Tests
 │   └── reports/                # Graphiques générés
 ├── Phase 2/                    # À venir
-└── Phase 3/                    # À venir
+├── Phase 3/                    # À venir
+└── Phase 4/                    # À venir
 ```
 
 ---
 
-*Projet en cours de développement - les phases 2 et 3 seront implémentées progressivement.*
+*Projet en cours de développement - les phases 2, 3 et 4 seront implémentées progressivement.*

@@ -1,6 +1,6 @@
 # Pricing Engine
 
-Python-based options pricing engine, developed incrementally across three phases.
+Python-based options pricing engine, developed incrementally across four phases.
 
 Personal project built alongside a derivatives course (Ensimag 2A), drawing on *Options, Futures and Other Derivatives* - John Hull (2024). Developed as part of a gap year preparation.
 
@@ -12,7 +12,8 @@ Personal project built alongside a derivatives course (Ensimag 2A), drawing on *
 |-------|---------|--------|
 | **Phase 1** | Black-Scholes, Greeks & Monte Carlo | In progress |
 | **Phase 2** | Stochastic Volatility - Heston & SABR | Coming soon |
-| **Phase 3** | Vol Surface Arbitrage Lab | Coming soon |
+| **Phase 3** | Stochastic Interest Rates - Vasicek, CIR & SVSI | Coming soon |
+| **Phase 4** | Vol Surface Arbitrage Lab | Coming soon |
 
 ---
 
@@ -32,20 +33,30 @@ Implementation of the foundations of vanilla option pricing.
 
 Extension towards non-constant volatility models.
 
-- Implied volatility surface construction
-- Heston model - pricing via Fourier transform (Carr-Madan)
-- Heston calibration via Differential Evolution
-- SABR model - Hagan approximation formula
+- 2.1 Implied volatility surface construction
+- 2.2 Heston model - Carr-Madan pricing
+- 2.3 Heston calibration - Differential Evolution
+- 2.4 SABR model - Hagan approximation formula
+- 2.5 Confrontation with real market data (SPY): closing the gap vs Phase 1
 
-## Phase 3 - Vol Surface Arbitrage Lab *(coming soon)*
+## Phase 3 - Stochastic Interest Rates *(coming soon)*
+
+Term-structure modelling and coupling with the underlying.
+
+- 3.1 Vasicek model: mean-reverting stochastic rate
+- 3.2 Cox-Ingersoll-Ross (CIR) model
+- 3.3 Rate/underlying coupling: SVSI model
+- 3.4 Confrontation with real market data: long-maturity options
+
+## Phase 4 - Vol Surface Arbitrage Lab *(coming soon)*
 
 Surface analysis and detection of pricing inconsistencies.
 
-- Arbitrage detection: calendar spread & butterfly
-- Dupire local volatility
-- Second-order Greeks: Vanna, Volga, Charm
-- P&L Explain
-- Stress tests and summary dashboard
+- 4.1 No-arbitrage - calendar spread & butterfly detection
+- 4.2 Dupire local volatility
+- 4.3 Second-order Greeks: Vanna, Volga, Charm
+- 4.4 P&L Explain
+- 4.5 Stress tests + final dashboard
 
 ---
 
@@ -135,9 +146,10 @@ Options Pricing Engine/
 │   ├── tests/                  # Tests
 │   └── reports/                # Generated charts
 ├── Phase 2/                    # Coming soon
-└── Phase 3/                    # Coming soon
+├── Phase 3/                    # Coming soon
+└── Phase 4/                    # Coming soon
 ```
 
 ---
 
-*Project under active development - phases 2 and 3 will be implemented incrementally.*
+*Project under active development - phases 2, 3 and 4 will be implemented incrementally.*
