@@ -24,7 +24,7 @@ PRICERS = {
     "MC Anti":       lambda opt, style: mc_antithetic(opt, n_paths=100000)[0] if style != 'American' else None,
     "MC Contr":      lambda opt, style: mc_control(opt, n_paths=100000)[0] if style != 'American' else None,
     "MC Anti Contr": lambda opt, style: mc_control_antithetic(opt, n_paths=50000)[0] if style != 'American' else None,
-    "lsm":           lambda opt, style: LSMoptionValue(opt, n_steps=50, n_paths=20000) if style == 'American' else None,
+    "lsm":           lambda opt, style: LSMoptionValue(opt, n_steps=50, n_paths=10000) if style == 'American' else None,
     "pde":           lambda opt, style: pde_crank_nicolson(opt, style=style.lower(), n_steps=200, n_space=200),
     "BS,pde":        lambda opt, style: _bs.price(opt) if style != 'American' else pde_crank_nicolson(opt, style=style.lower(), n_steps=200, n_space=200),
     "BS,crr":        lambda opt, style: _bs.price(opt) if style != 'American' else crr_price(opt, period=1000, american=True),
@@ -43,30 +43,41 @@ def calcPriceWithMethod(cleanData: pd.DataFrame, method: str):
     return times, prices
 
 
-def plot_figure(title, methods, data_subset, ref, ref_label, bar_color, filename):
-    times, maes = [], []
+def plot_figure(title, methods, data_subset, ref, ref_label, bar_color, filename, mae_methods=None):
+    # mae_methods : sous-ensemble de `methods` à afficher sur le graphe de MAE.
+    # Par défaut = methods, mais on exclut la méthode qui a servi à calculer
+    # `ref` elle-même (sinon sa MAE est trivialement 0, comparaison inutile).
+    if mae_methods is None:
+        mae_methods = methods
+
+    times = {}
+    maes = {}
     for method in methods:
         method_times, prices = calcPriceWithMethod(data_subset, method)
-        times.append(sum(method_times))
-        p = np.array(prices, dtype=float)
-        mask = ~np.isnan(p) & ~np.isnan(ref)
-        maes.append(np.mean(np.abs(p[mask] - ref[mask])))
-        print(f"  {method}: total={times[-1]:.2f}s  MAE={maes[-1]:.4f}")
+        times[method] = sum(method_times)
+        if method in mae_methods:
+            p = np.array(prices, dtype=float)
+            mask = ~np.isnan(p) & ~np.isnan(ref)
+            maes[method] = np.mean(np.abs(p[mask] - ref[mask]))
+            print(f"  {method}: total={times[method]:.2f}s  MAE={maes[method]:.4f}")
+        else:
+            print(f"  {method}: total={times[method]:.2f}s  (référence — MAE non affichée)")
 
-    x = np.arange(len(methods))
+    x_time = np.arange(len(methods))
+    x_mae  = np.arange(len(mae_methods))
     _, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
 
-    ax1.bar(x, times, color=bar_color, edgecolor="white")
+    ax1.bar(x_time, [times[m] for m in methods], color=bar_color, edgecolor="white")
     ax1.set_ylabel("Total time (s)")
     ax1.set_title(f"{title} — Execution time")
-    ax1.set_xticks(x)
+    ax1.set_xticks(x_time)
     ax1.set_xticklabels(methods, rotation=30, ha="right")
 
-    ax2.bar(x, maes, color="tomato", edgecolor="white")
+    ax2.bar(x_mae, [maes[m] for m in mae_methods], color="tomato", edgecolor="white")
     ax2.set_ylabel(f"MAE vs {ref_label} (€)")
     ax2.set_title(f"{title} — Mean Absolute Error vs {ref_label}")
-    ax2.set_xticks(x)
-    ax2.set_xticklabels(methods, rotation=30, ha="right")
+    ax2.set_xticks(x_mae)
+    ax2.set_xticklabels(mae_methods, rotation=30, ha="right")
 
     plt.tight_layout()
     plt.savefig(REPORTS / filename, dpi=150)
@@ -90,11 +101,12 @@ if __name__ == "__main__":
     ref_pde_am = np.array(ref_pde_am, dtype=float)
     ref_bspde  = np.array(ref_bspde,  dtype=float)
 
-    # Figure 1 — American options
+    # Figure 1 — American options (référence = pde -> exclu du graphe MAE)
     print("\n--- American options ---")
     plot_figure(
         title="American options",
         methods=["lsm", "crr", "pde"],
+        mae_methods=["lsm", "crr"],
         data_subset=cleanData_am,
         ref=ref_pde_am,
         ref_label="PDE",
@@ -102,11 +114,12 @@ if __name__ == "__main__":
         filename="benchmark_american.png",
     )
 
-    # Figure 2 — European options
+    # Figure 2 — European options (référence = BS -> exclu du graphe MAE)
     print("\n--- European options ---")
     plot_figure(
         title="European options",
         methods=["BS", "MC Naive", "MC Anti", "MC Contr", "MC Anti Contr", "crr", "pde"],
+        mae_methods=["MC Naive", "MC Anti", "MC Contr", "MC Anti Contr", "crr", "pde"],
         data_subset=cleanData_eu,
         ref=ref_bs_eu,
         ref_label="BS",
@@ -114,11 +127,12 @@ if __name__ == "__main__":
         filename="benchmark_european.png",
     )
 
-    # Figure 3 — Full book (both styles) + combinations
+    # Figure 3 — Full book (both styles) + combinations (référence = BS,pde -> exclu du graphe MAE)
     print("\n--- Full book ---")
     plot_figure(
         title="Full book — both styles",
         methods=["crr", "pde", "BS,pde", "BS,crr", "BS,lsm"],
+        mae_methods=["crr", "pde", "BS,crr", "BS,lsm"],
         data_subset=cleanData,
         ref=ref_bspde,
         ref_label="BS+PDE",

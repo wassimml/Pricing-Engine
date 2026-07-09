@@ -65,7 +65,7 @@ if __name__ == "__main__":
             elif method == "CRR":
                 return crr_price(opt, period=200, american=True)
             elif method == "LSM":
-                return LSMoptionValue(opt, n_steps=50, n_paths=20000)
+                return LSMoptionValue(opt, n_steps=50, n_paths=10000)
             elif method == "PDE":
                 return pde_crank_nicolson(opt, style="american", n_steps=200, n_space=200)
         except Exception:

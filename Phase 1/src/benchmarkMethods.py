@@ -21,7 +21,7 @@ METHODS = {
     "MC Control":   (lambda opt, p, _: mc_control(opt, n_paths=p)[0],                             [1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 200_000], "European"),
     "MC Anti+Ctrl": (lambda opt, p, _: mc_control_antithetic(opt, n_paths=p)[0],                  [1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 200_000], "European"),
     "CRR":          (lambda opt, p, style: crr_price(opt, period=p, american=(style == 'American')), [50, 100, 200, 500, 1_000],                              None),
-    "LSM":          (lambda opt, p, _: LSMoptionValue(opt, n_steps=50, n_paths=p),                [1_000, 5_000, 10_000, 25_000, 50_000],                    "American"),
+    "LSM":          (lambda opt, p, _: LSMoptionValue(opt, n_steps=50, n_paths=p),                [1_000, 5_000, 10_000, 20_000, 25_000, 50_000],                    "American"),
 }
 
 def run_method(cleanData: pd.DataFrame, pricer, params: list, style_filter):

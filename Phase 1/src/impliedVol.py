@@ -1,15 +1,23 @@
 import numpy as np
+import pandas as pd
 from scipy.stats import norm
 from scipy.optimize import brentq
 import matplotlib.pyplot as plt
 from pathlib import Path
-import yfinance as yf
-from datetime import datetime
 
 from BSpricer import BSModel
+from binomial import crr_price
+from monteCarloLSM import LSMoptionValue
+from pde import pde_crank_nicolson
 from option import Option
 
+DATA = Path(__file__).parent.parent / "data"
 REPORTS = Path(__file__).parent.parent / "reports"
+
+# Snapshot figé de la chaîne calls AAPL (cf. makeSnapshotAAPL.py), rejoué ici
+# pour recalculer la smile / la surface de vol implicite sur des données
+# identiques d'un run à l'autre (reproductibilité des tests).
+SNAPSHOT_PATH = DATA / "AAPL_options_2026-07-09.csv"
 
 
 def BS_price(S: float, K: float, T: float, r: float, sigma: float, option_type: str = "call"):
@@ -35,8 +43,97 @@ def BS_price(S: float, K: float, T: float, r: float, sigma: float, option_type: 
 
     return price
 
+def implied_volatility_CRR(market_price: float, S: float, K: float, T: float, r: float, option_type: str = "call"):
+    """
+    Calcule la volatilité implicite par résolution numérique.
 
-def implied_volatility(market_price: float, S: float, K: float, T: float, r: float, option_type: str = "call"):
+    market_price : prix observé de l'option
+    S             : prix spot de l'actif
+    K             : strike
+    T             : temps jusqu'à maturité (en années)
+    r             : taux sans risque
+
+    Retourne np.nan si aucune solution n'existe dans l'intervalle de recherche.
+    """
+    def objective(sigma):
+        opt = Option(S=S, K=K, T=T, r=r, sigma=sigma, kind=option_type)
+        return crr_price(opt, 500, True) - market_price
+
+    # Borne basse à 1% (pas 1e-6) : en dessous, u ≈ d ≈ 1 dans l'arbre CRR,
+    # la probabilité risque-neutre p=(e^{rΔt}-d)/(u-d) explose (u-d ≈ 0) et
+    # l'induction rétrograde diverge (overflow / NaN) — pas une vol réaliste
+    # de toute façon.
+    sigma_min = 1e-2
+
+    # Vérifier que la solution existe dans l'intervalle avant d'appeler brentq
+    f_low = objective(sigma_min)
+    f_high = objective(5)
+    if np.isnan(f_low) or np.isnan(f_high) or f_low * f_high > 0:
+        return np.nan
+
+    # Recherche entre 1% et 500% de volatilité
+    iv = brentq(objective, sigma_min, 5)
+    return iv
+
+
+def implied_volatility_LSM(market_price: float, S: float, K: float, T: float, r: float, option_type: str = "call"):
+    """
+    Calcule la volatilité implicite par résolution numérique (pricer Longstaff-Schwartz).
+
+    market_price : prix observé de l'option
+    S             : prix spot de l'actif
+    K             : strike
+    T             : temps jusqu'à maturité (en années)
+    r             : taux sans risque
+
+    Retourne np.nan si aucune solution n'existe dans l'intervalle de recherche.
+    """
+    # n_paths/n_steps réduits par rapport à un pricing ponctuel (20000/50) :
+    # brentq évalue l'objectif une dizaine de fois par option, et le seed fixe
+    # (cf. LSMoptionValue) rend la fonction déterministe donc toujours
+    # inversible, même avec moins de trajectoires — nécessaire pour que
+    # l'inversion reste rapide sur toute la smile/surface.
+    def objective(sigma):
+        opt = Option(S=S, K=K, T=T, r=r, sigma=sigma, kind=option_type)
+        return LSMoptionValue(opt, n_steps=30, n_paths=4000) - market_price
+
+    sigma_min = 1e-2
+    f_low = objective(sigma_min)
+    f_high = objective(5)
+    if np.isnan(f_low) or np.isnan(f_high) or f_low * f_high > 0:
+        return np.nan
+
+    iv = brentq(objective, sigma_min, 5)
+    return iv
+
+
+def implied_volatility_PDE(market_price: float, S: float, K: float, T: float, r: float, option_type: str = "call"):
+    """
+    Calcule la volatilité implicite par résolution numérique (PDE Crank-Nicolson).
+
+    market_price : prix observé de l'option
+    S             : prix spot de l'actif
+    K             : strike
+    T             : temps jusqu'à maturité (en années)
+    r             : taux sans risque
+
+    Retourne np.nan si aucune solution n'existe dans l'intervalle de recherche.
+    """
+    def objective(sigma):
+        opt = Option(S=S, K=K, T=T, r=r, sigma=sigma, kind=option_type)
+        return pde_crank_nicolson(opt, style="american", n_steps=200, n_space=200) - market_price
+
+    sigma_min = 1e-2
+    f_low = objective(sigma_min)
+    f_high = objective(5)
+    if np.isnan(f_low) or np.isnan(f_high) or f_low * f_high > 0:
+        return np.nan
+
+    iv = brentq(objective, sigma_min, 5)
+    return iv
+
+
+def implied_volatility_BS(market_price: float, S: float, K: float, T: float, r: float, option_type: str = "call"):
     """
     Calcule la volatilité implicite par résolution numérique.
 
@@ -71,106 +168,98 @@ if __name__ == "__main__":
     r = 0.05
     option_type = "call"
 
-    iv = implied_volatility(market_price, S, K, T, r, option_type)
+    iv = implied_volatility_CRR(market_price, S, K, T, r, option_type)
     print(f"Volatilité implicite : {iv:.4f}")
 
-    # ── Récupération de la chaîne d'options réelle ──
-    ticker = yf.Ticker("AAPL")
-    expirations = ticker.options
-
-    today = datetime.today()
-    valid_expirations = [
-        e for e in expirations
-        if (datetime.strptime(e, "%Y-%m-%d") - today).days > 7
-    ]
+    # ── Chargement du snapshot d'options AAPL (figé, cf. SNAPSHOT_PATH) ──────
+    print(f"\nChargement du snapshot : {SNAPSHOT_PATH.name}")
+    df_snap = pd.read_csv(SNAPSHOT_PATH)
+    S = float(df_snap["S"].iloc[0])
+    r = float(df_snap["r"].iloc[0])
+    valid_expirations = sorted(df_snap["expiry"].unique())
     expiry = valid_expirations[0]
+    T = float(df_snap.loc[df_snap["expiry"] == expiry, "T"].iloc[0])
 
-    chain = ticker.option_chain(expiry)
-    calls = chain.calls
-
-    # ── Vrais paramètres de marché ──
-    S = ticker.history(period="1d")["Close"].iloc[-1]
-    expiry_date = datetime.strptime(expiry, "%Y-%m-%d")
-    T = (expiry_date - today).days / 365
-    r = 0.05
-
-    print(f"Spot AAPL : {S:.2f}")
+    print(f"Spot AAPL (snapshot) : {S:.2f}")
     print(f"Maturité choisie : {expiry}, T = {T:.4f} an(s)")
 
-    # ── Filtrage : ne garder que les options avec cotation active ──
-    calls_clean = calls[(calls['bid'] > 0) & (calls['ask'] > 0)].copy()
-    calls_clean['mid_price'] = (calls_clean['bid'] + calls_clean['ask']) / 2
+    # ── Smile + surface, répétées pour chaque méthode d'inversion ────────────
+    METHODS = {
+        "BS":  implied_volatility_BS,
+        "CRR": implied_volatility_CRR,
+        "LSM": implied_volatility_LSM,
+        "PDE": implied_volatility_PDE,
+    }
 
-    strikes = calls_clean['strike'].values
-    market_prices = calls_clean['mid_price'].values
+    for name, iv_func in METHODS.items():
+        print(f"\n=== Méthode : {name} ===")
 
-    implied_vols = np.array([implied_volatility(mp, S, K, T, r, option_type)
-                              for mp, K in zip(market_prices, strikes)])
+        # -- Smile pour l'échéance la plus proche (déjà filtrée bid/ask > 0) --
+        calls_clean = df_snap[df_snap["expiry"] == expiry].copy()
 
-    valid_smile = ~np.isnan(implied_vols)
+        strikes = calls_clean['strike'].values
+        market_prices = calls_clean['mid'].values
 
-    diff = np.abs(implied_vols[valid_smile] - calls_clean['impliedVolatility'].values[valid_smile])
-    print(f"Erreur moyenne absolue : {diff.mean():.4f}")
-    print(f"Erreur max : {diff.max():.4f}")
+        implied_vols = np.array([iv_func(mp, S, K, T, r, option_type)
+                                  for mp, K in zip(market_prices, strikes)])
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(strikes[valid_smile], implied_vols[valid_smile], 'o-', label='Implied Volatility (BS Model)')
-    plt.plot(strikes[valid_smile], calls_clean['impliedVolatility'].values[valid_smile], 'x-',
-              label='Implied Volatility (from Yahoo Finance)')
-    plt.axvline(S, color='grey', lw=0.8, ls=':', label='Spot')
-    plt.title(f'Implied Volatility vs Strike Price — AAPL ({expiry})')
-    plt.xlabel('Strike Price')
-    plt.ylabel('Implied Volatility')
-    plt.legend()
-    plt.grid()
-    plt.savefig(REPORTS / 'implied_volatility_vs_strike.png')
-    plt.show()
+        valid_smile = ~np.isnan(implied_vols)
 
-    # ── Construction de la surface de volatilité ──
-    strikes_surface = []
-    maturities_surface = []
-    implied_vols_surface = []
+        diff = np.abs(implied_vols[valid_smile] - calls_clean['impliedVolatility'].values[valid_smile])
+        print(f"  Smile — Erreur moyenne absolue : {diff.mean():.4f}")
+        print(f"  Smile — Erreur max : {diff.max():.4f}")
 
-    for expiry in valid_expirations:
-        expiry_date = datetime.strptime(expiry, "%Y-%m-%d")
-        T = (expiry_date - today).days / 365
+        plt.figure(figsize=(10, 6))
+        plt.plot(strikes[valid_smile], implied_vols[valid_smile], 'o-', label=f'Implied Volatility ({name} Model)')
+        plt.plot(strikes[valid_smile], calls_clean['impliedVolatility'].values[valid_smile], 'x-',
+                  label='Implied Volatility (from Yahoo Finance)')
+        plt.axvline(S, color='grey', lw=0.8, ls=':', label='Spot')
+        plt.title(f'Implied Volatility vs Strike Price — AAPL ({expiry}) — {name}')
+        plt.xlabel('Strike Price')
+        plt.ylabel('Implied Volatility')
+        plt.legend()
+        plt.grid()
+        plt.savefig(REPORTS / f'implied_volatility_vs_strike_{name}.png')
+        plt.show()
 
-        chain = ticker.option_chain(expiry)
-        calls = chain.calls
-        calls_clean = calls[(calls['bid'] > 0) & (calls['ask'] > 0)].copy()
-        calls_clean['mid_price'] = (calls_clean['bid'] + calls_clean['ask']) / 2
+        # -- Construction de la surface de volatilité --
+        strikes_surface = []
+        maturities_surface = []
+        implied_vols_surface = []
 
-        # Filtre moneyness : garde uniquement les strikes raisonnablement proches du spot
-        calls_clean = calls_clean[
-            (calls_clean['strike'] / S > 0.7) & (calls_clean['strike'] / S < 1.3)
-        ]
+        for exp in valid_expirations:
+            sub = df_snap[df_snap["expiry"] == exp]
+            T_exp = float(sub["T"].iloc[0])
 
-        strikes_t = calls_clean['strike'].values
-        market_prices_t = calls_clean['mid_price'].values
+            # Filtre moneyness : garde uniquement les strikes raisonnablement proches du spot
+            sub = sub[(sub['strike'] / S > 0.7) & (sub['strike'] / S < 1.3)]
 
-        implied_vols_t = np.array([implied_volatility(mp, S, K, T, r, option_type)
-                                    for mp, K in zip(market_prices_t, strikes_t)])
+            strikes_t = sub['strike'].values
+            market_prices_t = sub['mid'].values
 
-        valid = ~np.isnan(implied_vols_t) & (implied_vols_t > 0.05) & (implied_vols_t < 1.5)
+            implied_vols_t = np.array([iv_func(mp, S, K, T_exp, r, option_type)
+                                        for mp, K in zip(market_prices_t, strikes_t)])
 
-        strikes_surface.extend(strikes_t[valid])
-        maturities_surface.extend([T] * sum(valid))
-        implied_vols_surface.extend(implied_vols_t[valid])
+            valid = ~np.isnan(implied_vols_t) & (implied_vols_t > 0.05) & (implied_vols_t < 1.5)
 
-    strikes_surface = np.array(strikes_surface)
-    maturities_surface = np.array(maturities_surface)
-    implied_vols_surface = np.array(implied_vols_surface)
+            strikes_surface.extend(strikes_t[valid])
+            maturities_surface.extend([T_exp] * sum(valid))
+            implied_vols_surface.extend(implied_vols_t[valid])
 
-    # ── Affichage surface 3D ──
-    fig = plt.figure(figsize=(12, 8))
-    ax = fig.add_subplot(111, projection='3d')
-    surface = ax.plot_trisurf(strikes_surface, maturities_surface, implied_vols_surface,
-                               cmap='viridis', linewidth=0.2)
-    ax.set_title('Surface de volatilité implicite — AAPL')
-    ax.set_xlabel('Strike')
-    ax.set_ylabel('Maturité (années)')
-    ax.set_zlabel('Volatilité implicite')
-    ax.view_init(elev=25, azim=45)
-    fig.colorbar(surface, shrink=0.5, aspect=10, label='IV')
-    plt.savefig(REPORTS / 'volatility_surface.png')
-    plt.show()
+        strikes_surface = np.array(strikes_surface)
+        maturities_surface = np.array(maturities_surface)
+        implied_vols_surface = np.array(implied_vols_surface)
+
+        # -- Affichage surface 3D --
+        fig = plt.figure(figsize=(12, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        surface = ax.plot_trisurf(strikes_surface, maturities_surface, implied_vols_surface,
+                                   cmap='viridis', linewidth=0.2)
+        ax.set_title(f'Surface de volatilité implicite — AAPL — {name}')
+        ax.set_xlabel('Strike')
+        ax.set_ylabel('Maturité (années)')
+        ax.set_zlabel('Volatilité implicite')
+        ax.view_init(elev=25, azim=45)
+        fig.colorbar(surface, shrink=0.5, aspect=10, label='IV')
+        plt.savefig(REPORTS / f'volatility_surface_{name}.png')
+        plt.show()
