@@ -58,6 +58,15 @@ if __name__ == "__main__":
     df = df[df["mid"] >= lb]
     print(f"No-arbitrage > {len(df)}  ({n_before - len(df)} écartées)")
 
+    # - Filtre : liquidité minimale (open interest) ----------------------------
+    # bid/ask > 0 n'exclut pas les contrats au carnet d'ordre figé (cotation
+    # affichée mais jamais rafraîchie faute d'activité) : openInterest est un
+    # meilleur proxy de liquidité réelle que le volume du jour (qui peut être
+    # nul même sur un contrat activement quoté par les market makers).
+    n_before = len(df)
+    df = df[df["openInterest"].fillna(0) >= 10]
+    print(f"Open interest >= 10 > {len(df)}  ({n_before - len(df)} écartées)")
+
     # - Sauvegarde --------------------------------------------------------------
     snapshot_path = DATA / f"AAPL_options_{today.date()}.csv"
     df.to_csv(snapshot_path, index=False)

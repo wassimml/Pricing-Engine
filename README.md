@@ -10,7 +10,7 @@ Personal project built alongside a derivatives course (Ensimag 2A), drawing on *
 
 | Phase | Content | Status |
 |-------|---------|--------|
-| **Phase 1** | Black-Scholes, Greeks & Monte Carlo | In progress |
+| **Phase 1** | Black-Scholes, Greeks, CRR, Monte Carlo & PDE | In progress |
 | **Phase 2** | Stochastic Volatility - Heston & SABR | Coming soon |
 | **Phase 3** | Stochastic Interest Rates - Vasicek, CIR & SVSI | Coming soon |
 | **Phase 4** | Vol Surface Arbitrage Lab | Coming soon |
@@ -25,9 +25,11 @@ Implementation of the foundations of vanilla option pricing.
 - Black-Scholes-Merton analytical formula - European calls and puts
 - Analytical Greeks: Delta, Gamma, Theta, Vega, Rho
 - Monte Carlo simulation with variance reduction
-- CRR Binomial tree / Longstaff-Schwartz LSM / PDE - American options with early exercise
+- CRR Binomial tree
+- Longstaff-Schwartz LSM - order-3 polynomial regression
+- PDE - Crank-Nicolson
 - Implied volatility via Newton-Raphson 
-- BS / MC / CRR benchmark on real SPY data **(In progress)**
+- BS / MC / LSM / CRR / PDE benchmark on real SPY data **(In progress)**
 
 ## Phase 2 - Stochastic Volatility *(coming soon)*
 
@@ -60,59 +62,18 @@ Surface analysis and detection of pricing inconsistencies.
 
 ---
 
-## Usage
+## Web app
 
-From the `Phase 1/` directory:
-
-```bash
-python src/pricerTerminal.py --S <spot> --K <strike> --T <maturity> --r <rate> --sigma <vol> --kind <call|put> [--method <method>] [--style <european|american>] [--steps N] [--n-paths N] [--seed N] [--n-space N]
-```
-
-**Available methods**
-
-| `--method` | Description | Style |
-|---|---|---|
-| `bs` *(default)* | Black-Scholes-Merton analytical formula | european |
-| `binomial` | CRR binomial tree | european / american |
-| `mc-naive` | Naive Monte Carlo | european |
-| `mc-antithetic` | Monte Carlo - antithetic variates | european |
-| `mc-control` | Monte Carlo - control variate | european |
-| `mc-control-antithetic` | Monte Carlo - antithetic + control variate | european |
-| `mc-lsm` | Longstaff-Schwartz Monte Carlo | american |
-| `pde` | Crank-Nicolson PDE via QuantLib | european / american |
-
-**Specific flags**
-
-| Flag | Default | Usage |
-|---|---|---|
-| `--style` | `european` | Exercise style for `binomial`, `mc-lsm` and `pde` |
-| `--steps` | `100` | Number of time steps — binomial, mc-lsm, pde |
-| `--n-paths` | `100000` | Number of MC paths |
-| `--seed` | `42` | MC random seed |
-| `--n-space` | `200` | Number of space steps for `pde` |
-
-**Examples**
+A Streamlit app ties the whole project together: interactive pricer, Greeks, and a browsable
+gallery of every study (convergence, benchmarks, implied volatility).
 
 ```bash
-# Black-Scholes
-python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind call
-
-# American put — binomial tree, 500 steps
-python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method binomial --style american --steps 500
-
-# Antithetic Monte Carlo, 200,000 paths
-python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method mc-antithetic --n-paths 200000
-
-# American put — Longstaff-Schwartz
-python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method mc-lsm --style american --steps 50 --n-paths 50000
-
-# American put — Crank-Nicolson PDE
-python src/pricerTerminal.py --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2 --kind put --method pde --style american --steps 200 --n-space 200
+cd "Phase 1"
+streamlit run app.py
 ```
 
-```bash
-python src/pricerTerminal.py -h   # full help
-```
+The app's interface (layout, pages, visual identity) was built with Claude. Building a
+Streamlit dashboard isn't the point of this project, pricing methods are.
 
 ---
 
@@ -120,8 +81,8 @@ python src/pricerTerminal.py -h   # full help
 
 The Phase 1 documentation is split into two distinct documents:
 
-- **[Pricing d'Options - Théorie, Méthodes et Démonstrations](Phase%201/Pricing%20d'Options%20-%20Théorie%2C%20Méthodes%20et%20Démonstrations.pdf)** — theoretical report covering the mathematical foundations of each method (Black-Scholes, Greeks, Monte Carlo and variance reduction, CRR binomial tree, Longstaff-Schwartz, PDE/Crank-Nicolson, implied volatility and volatility surface), with proofs and numerical examples.
-- **[Pricing d'Options - Benchmark des Méthodes](Phase%201/Pricing%20d'Options%20-%20Benchmark%20des%20Méthodes.pdf)** — practical document benchmarking all methods against each other on a large set of options (~2000), then against real market data from a liquid underlying (SPY).
+- **[Pricing d'Options - Théorie, Méthodes et Démonstrations](Phase%201/Pricing%20d'Options%20-%20Théorie%2C%20Méthodes%20et%20Démonstrations.pdf)** : theoretical report covering the mathematical foundations of each method (Black-Scholes, Greeks, Monte Carlo and variance reduction, CRR binomial tree, Longstaff-Schwartz, PDE/Crank-Nicolson, implied volatility and volatility surface), with proofs and numerical examples.
+- **[Pricing d'Options - Benchmark des Méthodes](Phase%201/Pricing%20d'Options%20-%20Benchmark%20des%20Méthodes.pdf)** : practical document benchmarking all methods against each other on a large set of options (~2000), then against real market data from a liquid underlying (SPY).
 
 ---
 
@@ -130,24 +91,33 @@ The Phase 1 documentation is split into two distinct documents:
 ```
 Options Pricing Engine/
 ├── Phase 1/
+│   ├── app.py                    # Streamlit app entry point (navigation)
+│   ├── app_theme.py              # Shared "slate & gold" visual identity (palette, CSS, Plotly template)
+│   ├── app_pages/                # Streamlit pages (pricer, greeks, benchmarks, ...)
 │   ├── src/
-│   │   ├── option.py           # Option contract (dataclass)
-│   │   ├── BSpricer.py         # Black-Scholes-Merton
-│   │   ├── greeks.py           # Greeks (Delta, Gamma, Theta, Vega, Rho)
-│   │   ├── gbm.py              # GBM simulation (MCEngine)
-│   │   ├── deltaHedging.py     # Discrete delta hedging
-│   │   ├── deltaHedgingMC.py   # Monte Carlo delta hedging
-│   │   ├── monteCarlo.py       # Monte Carlo methods (naive, antithetic, control)
-│   │   ├── monteCarloLSM.py    # Longstaff-Schwartz Monte Carlo (american)
-│   │   ├── binomial.py         # CRR binomial tree (european / american)
-│   │   ├── pde.py              # Crank-Nicolson PDE via QuantLib
-│   │   ├── pricerTerminal.py   # CLI interface
-│   │   └── benchmark.py        # Benchmark all methods on ~2000 real options
-│   ├── tests/                  # Tests
-│   └── reports/                # Generated charts
-├── Phase 2/                    # Coming soon
-├── Phase 3/                    # Coming soon
-└── Phase 4/                    # Coming soon
+│   │   ├── option.py            # Option contract (dataclass)
+│   │   ├── BSpricer.py          # Black-Scholes-Merton
+│   │   ├── greeks.py            # Greeks (Delta, Gamma, Theta, Vega, Rho)
+│   │   ├── gbm.py               # GBM simulation (MCEngine)
+│   │   ├── deltaHedging.py      # Discrete delta hedging
+│   │   ├── deltaHedgingMC.py    # Monte Carlo delta hedging
+│   │   ├── monteCarlo.py        # Monte Carlo methods (naive, antithetic, control) + seed-averaged convergence
+│   │   ├── monteCarloLSM.py     # Longstaff-Schwartz Monte Carlo (american) + seed-averaged convergence
+│   │   ├── binomial.py          # CRR binomial tree (european / american)
+│   │   ├── pde.py               # Crank-Nicolson PDE via QuantLib
+│   │   ├── impliedVol.py        # Implied vol inversion (BS/CRR/LSM/PDE) + smile & surface (AAPL)
+│   │   ├── timeValue.py         # Time value study (BS, spot x maturity 3D surface)
+│   │   ├── benchmarkMethods.py  # Accuracy/speed vs parameter sweep (3D)
+│   │   ├── benchmarkInData.py   # Benchmark all methods on ~2000 synthetic options
+│   │   ├── benchmarkSPY.py      # Benchmark LSM/CRR/PDE vs real SPY market data
+│   │   ├── makeSnapshotSPY.py   # Generate a reproducible SPY options snapshot
+│   │   └── makeSnapshotAAPL.py  # Generate a reproducible AAPL options snapshot
+│   ├── data/                    # Synthetic book + frozen market snapshots
+│   ├── tests/                   # Tests
+│   └── reports/                 # Generated charts
+├── Phase 2/                     # Coming soon
+├── Phase 3/                     # Coming soon
+└── Phase 4/                     # Coming soon
 ```
 
 ---
