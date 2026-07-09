@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 import time
 
 from option import Option
-from gbm import MCEngine
-from binomial import crr_price
+from pde import pde_crank_nicolson
 
 REPORTS = Path(__file__).parent.parent / "reports"
 
@@ -65,61 +64,86 @@ def LSMoptionValue(option, n_steps=50, n_paths=4096, seed=42):
     return V0
 
 
+def lsm_mean_std(option, n_steps, n_paths, n_seeds, base_seed=0):
+    """Moyenne et écart-type du prix LSM sur n_seeds tirages indépendants.
+
+    Une seule réalisation (seed fixe) ne permet pas de distinguer un vrai
+    comportement de convergence d'un artefact du tirage aléatoire particulier
+    — on répète donc chaque configuration sur plusieurs seeds indépendants.
+    """
+    prices = np.array([
+        LSMoptionValue(option, n_steps=n_steps, n_paths=n_paths, seed=base_seed + s)
+        for s in range(n_seeds)
+    ])
+    return prices.mean(), prices.std()
+
+
 if __name__ == "__main__":
     kind = 'put'
     option = Option(S=100, K=100, T=1, r=0.05, sigma=0.2, kind=kind)
 
-    # ── Étape 1 : référence fiable via CRR ──
-    reference_period = 5000
-    reference_price = crr_price(option, period=reference_period, american=True)
-    print(f"Prix de référence (CRR, N={reference_period}): {reference_price:.4f}\n")
+    N_SEEDS = 25  # répétitions indépendantes par configuration
+
+    # ── Étape 1 : référence fiable via PDE Crank-Nicolson ──
+    reference_price = pde_crank_nicolson(option, style='american', n_steps=500, n_space=500)
+    print(f"Prix de référence (PDE Crank-Nicolson, N=500x500): {reference_price:.4f}\n")
 
     # ── Étape 2 : convergence de LSM en fonction de n_paths (n_steps fixé) ──
     n_steps_lsm = 50
     paths_list = [1000, 5000, 10000, 50000, 100000]
 
-    print(f"--- Convergence LSM vs n_paths (n_steps={n_steps_lsm} fixé) ---")
+    print(f"--- Convergence LSM vs n_paths (n_steps={n_steps_lsm} fixé, {N_SEEDS} seeds) ---")
     results_paths = []
     for n_p in paths_list:
         t0 = time.perf_counter()
-        price = LSMoptionValue(option, n_steps=n_steps_lsm, n_paths=n_p, seed=42)
+        mean_price, std_price = lsm_mean_std(option, n_steps_lsm, n_p, N_SEEDS)
         elapsed = time.perf_counter() - t0
-        error = abs(price - reference_price)/reference_price
-        results_paths.append((n_p, price, error, elapsed))
-        print(f"n_paths={n_p:7d}  LSM={price:.4f}  erreur={error:.4f}  ({elapsed:.2f}s)")
+        error     = abs(mean_price - reference_price) / reference_price
+        error_std = std_price / reference_price
+        results_paths.append((n_p, mean_price, error, error_std, elapsed))
+        print(f"n_paths={n_p:7d}  LSM={mean_price:.4f}±{std_price:.4f}  "
+              f"erreur={error:.4f}±{error_std:.4f}  ({elapsed:.2f}s)")
 
     # ── Étape 3 : convergence de LSM en fonction de n_steps (n_paths fixé) ──
-    n_paths_fixed = 50000
+    # n_paths_fixed aligné sur la configuration utilisée en production (cf. benchmarkSPY.py)
+    n_paths_fixed = 10000
     steps_list = [20, 50, 100, 200]
 
-    print(f"\n--- Convergence LSM vs n_steps (n_paths={n_paths_fixed} fixé) ---")
+    print(f"\n--- Convergence LSM vs n_steps (n_paths={n_paths_fixed} fixé, {N_SEEDS} seeds) ---")
     results_steps = []
     for n in steps_list:
         t0 = time.perf_counter()
-        price = LSMoptionValue(option, n_steps=n, n_paths=n_paths_fixed, seed=42)
+        mean_price, std_price = lsm_mean_std(option, n, n_paths_fixed, N_SEEDS)
         elapsed = time.perf_counter() - t0
-        error = abs(price - reference_price)/reference_price
-        results_steps.append((n, price, error, elapsed))
-        print(f"n_steps={n:4d}  LSM={price:.4f}  erreur={error:.4f}  ({elapsed:.2f}s)")
+        error     = abs(mean_price - reference_price) / reference_price
+        error_std = std_price / reference_price
+        results_steps.append((n, mean_price, error, error_std, elapsed))
+        print(f"n_steps={n:4d}  LSM={mean_price:.4f}±{std_price:.4f}  "
+              f"erreur={error:.4f}±{error_std:.4f}  ({elapsed:.2f}s)")
 
     # ── Graphes ──
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
-    axes[0].plot([r[0] for r in results_paths], [r[2] for r in results_paths], 'o-', color='steelblue')
+    axes[0].errorbar([r[0] for r in results_paths], [r[2] for r in results_paths],
+                      yerr=[r[3] for r in results_paths], fmt='o-', color='steelblue',
+                      ecolor='steelblue', capsize=3, alpha=0.85)
     axes[0].axhline(0, color='red', ls='--', lw=0.8)
     axes[0].set_xscale('log')
     axes[0].set_xlabel('n_paths')
-    axes[0].set_ylabel('|LSM - référence CRR|/référence CRR')
-    axes[0].set_title(f'Convergence vs n_paths (n_steps={n_steps_lsm})')
+    axes[0].set_ylabel('|LSM - référence PDE|/référence PDE\n(moyenne ± écart-type)')
+    axes[0].set_title(f'Convergence vs n_paths (n_steps={n_steps_lsm}, {N_SEEDS} seeds)')
 
-    axes[1].plot([r[0] for r in results_steps], [r[2] for r in results_steps], 'o-', color='orange')
+    axes[1].errorbar([r[0] for r in results_steps], [r[2] for r in results_steps],
+                      yerr=[r[3] for r in results_steps], fmt='o-', color='orange',
+                      ecolor='orange', capsize=3, alpha=0.85)
     axes[1].axhline(0, color='red', ls='--', lw=0.8)
     axes[1].set_xlabel('n_steps')
-    axes[1].set_ylabel('|LSM - référence CRR|/référence CRR')
-    axes[1].set_title(f'Convergence vs n_steps (n_paths={n_paths_fixed})')
+    axes[1].set_ylabel('|LSM - référence PDE|/référence PDE\n(moyenne ± écart-type)')
+    axes[1].set_title(f'Convergence vs n_steps (n_paths={n_paths_fixed}, {N_SEEDS} seeds)')
 
     plt.suptitle(f'LSM convergence — Put américain (S=K=100, T=1, r=5%, σ=20%)\n'
-                 f'Référence CRR (N={reference_period}) = {reference_price:.4f}', fontsize=12)
+                 f'Référence PDE Crank-Nicolson = {reference_price:.4f}  |  '
+                 f'{N_SEEDS} seeds indépendants par point', fontsize=12)
     plt.tight_layout()
     plt.savefig(REPORTS / 'lsm_convergence.png')
     plt.show()
@@ -127,38 +151,40 @@ if __name__ == "__main__":
     # ── Étape 4 : grille croisée (n_steps x n_paths) pour le graphe 3D ──
     steps_grid = [10, 25, 50, 100, 200]
     paths_grid = [1000, 5000, 10000, 50000, 100000]
- 
-    print(f"\n--- Grille croisée n_steps x n_paths (pour le graphe 3D) ---")
-    error_grid = np.zeros((len(steps_grid), len(paths_grid)))
- 
+
+    print(f"\n--- Grille croisée n_steps x n_paths (pour le graphe 3D, {N_SEEDS} seeds) ---")
+    error_grid     = np.zeros((len(steps_grid), len(paths_grid)))
+    error_std_grid = np.zeros((len(steps_grid), len(paths_grid)))
+
     for i, n_steps in enumerate(steps_grid):
         for j, n_paths in enumerate(paths_grid):
             t0 = time.perf_counter()
-            price = LSMoptionValue(option, n_steps=n_steps, n_paths=n_paths, seed=42)
+            mean_price, std_price = lsm_mean_std(option, n_steps, n_paths, N_SEEDS)
             elapsed = time.perf_counter() - t0
-            error = abs(price - reference_price) / reference_price
-            error_grid[i, j] = error
+            error_grid[i, j]     = abs(mean_price - reference_price) / reference_price
+            error_std_grid[i, j] = std_price / reference_price
             print(f"n_steps={n_steps:4d}  n_paths={n_paths:7d}  "
-                  f"price={price:.4f}  erreur={error:.4f}  ({elapsed:.2f}s)")
- 
+                  f"price={mean_price:.4f}±{std_price:.4f}  "
+                  f"erreur={error_grid[i, j]:.4f}  ({elapsed:.2f}s)")
+
     # ── Graphe 3D ──
     Steps, LogPaths = np.meshgrid(steps_grid, np.log10(paths_grid), indexing='ij')
- 
+
     fig3d = plt.figure(figsize=(12, 9))
     ax = fig3d.add_subplot(111, projection='3d')
- 
+
     surf = ax.plot_surface(Steps, LogPaths, error_grid,
                             cmap='viridis', edgecolor='k', linewidth=0.3, alpha=0.9)
- 
+
     ax.set_xlabel('n_steps')
     ax.set_ylabel('log10(n_paths)')
-    ax.set_zlabel('|LSM - référence CRR| / référence CRR')
-    ax.set_title(f'Convergence LSM — Erreur relative vs (n_steps, n_paths)\n'
+    ax.set_zlabel(f'|LSM - référence PDE| / référence PDE\n(moyenne sur {N_SEEDS} seeds)')
+    ax.set_title(f'Convergence LSM — Erreur relative moyenne vs (n_steps, n_paths)\n'
                  f'Put américain (S=K=100, T=1, r=5%, σ=20%) — '
-                 f'Référence CRR = {reference_price:.4f}')
+                 f'Référence PDE = {reference_price:.4f}  |  {N_SEEDS} seeds')
     ax.view_init(elev=25, azim=120)
-    fig3d.colorbar(surf, ax=ax, shrink=0.6, label='Erreur relative')
- 
+    fig3d.colorbar(surf, ax=ax, shrink=0.6, label='Erreur relative moyenne')
+
     plt.tight_layout()
 
     plt.savefig(REPORTS / 'lsm_convergence_3d.png', dpi=150)

@@ -70,120 +70,68 @@ def mc_control_antithetic(opt : Option, n_paths : int = 100000, seed : int = 42)
     # n_paths//2 independent pairs — not n_paths (pairs are correlated)
     return float(np.mean(discounted_adjusted)), np.std(discounted_adjusted) / np.sqrt(n_paths // 2)
 
+
+def mc_mean_std(pricer, opt, n_paths, n_seeds, base_seed=0):
+    """Moyenne et écart-type du prix MC sur n_seeds tirages indépendants.
+
+    Même logique que lsm_mean_std (cf. monteCarloLSM.py) : une seule
+    réalisation (seed fixe) ne permet pas de distinguer un vrai comportement
+    de convergence d'un artefact du tirage particulier — on répète donc
+    chaque n_paths sur plusieurs seeds indépendants.
+    """
+    prices = np.array([
+        pricer(opt, n_paths, seed=base_seed + s)[0]
+        for s in range(n_seeds)
+    ])
+    return prices.mean(), prices.std()
+
+
 if __name__ == "__main__":
     opt = Option(S=100, K=100, T=1, r=0.05, sigma=0.2, kind='call')
     n_paths = 100000
+    N_SEEDS = 25  # répétitions indépendantes par n_paths (cf. monteCarloLSM.py)
 
-    print(f"----------------- Naive Monte Carlo pricing with {n_paths} paths -----------------")
-    price, std_error = mc_naive(opt, n_paths)
-    print(f"Monte Carlo price: {price:.4f}")
-    print(f"Standard error: {std_error:.4f}")
-
-    # Compare with BSM price
     model = BSModel()
     bsm_price = model.price(opt)
     print(f"BSM price: {bsm_price:.4f}")
 
-    # Difference
-    print(f"Difference: {abs(price - bsm_price):.4f}, Relative Difference: {abs(price - bsm_price)/bsm_price:.4%}")
+    METHODS = {
+        "naive":              ("Naive", mc_naive),
+        "antithetic":         ("Antithetic", mc_antithetic),
+        "control":            ("Control Variate", mc_control),
+        "control_antithetic": ("Control + Antithetic", mc_control_antithetic),
+    }
 
-    # Standard error of the Monte Carlo estimate
-    for path in [1000, 10000, 100000, 1000000]:
-        price, std_error = mc_naive(opt, path)
-        print(f"Standard error of Monte Carlo estimate: {std_error:.4f}, with {path} paths")
-
-    # Plot the difference as we increase the number of paths
     path_counts = [100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000]
-    mc_diffs = [abs(mc_naive(opt, n)[0] - bsm_price)/bsm_price *100 for n in path_counts]
-    plt.plot(path_counts, mc_diffs, marker='o', label='Monte Carlo difference')
-    plt.xscale('log')
-    plt.xlabel('Number of Paths')
-    plt.ylabel('Relative Difference from BSM Price (%)')
-    plt.title('Monte Carlo Price Convergence')
-    plt.legend()
-    plt.savefig(REPORTS / "monte_carlo_convergence_naive.png")
-    plt.show()
 
+    for key, (label, pricer) in METHODS.items():
+        print(f"\n----------------- {label} Monte Carlo pricing with {n_paths} paths -----------------")
+        price, std_error = pricer(opt, n_paths)
+        print(f"Monte Carlo price: {price:.4f}")
+        print(f"Standard error (théorique, seed unique): {std_error:.4f}")
+        print(f"BSM price: {bsm_price:.4f}")
+        print(f"Difference: {abs(price - bsm_price):.4f}, Relative Difference: {abs(price - bsm_price)/bsm_price:.4%}")
 
-    print(f"----------------- Antithetic Monte Carlo pricing with {n_paths} paths -----------------")
-    price, std_error = mc_antithetic(opt, n_paths)
-    print(f"Monte Carlo price: {price:.4f}")
-    print(f"Standard error: {std_error:.4f}")
+        print(f"--- Convergence ({N_SEEDS} seeds indépendants par n_paths) ---")
+        rel_diffs, rel_diffs_std = [], []
+        for n in path_counts:
+            mean_price, std_price = mc_mean_std(pricer, opt, n, N_SEEDS)
+            rel_diff     = abs(mean_price - bsm_price) / bsm_price * 100
+            rel_diff_std = std_price / bsm_price * 100
+            rel_diffs.append(rel_diff)
+            rel_diffs_std.append(rel_diff_std)
+            print(f"n_paths={n:9d}  price={mean_price:.4f}±{std_price:.4f}  "
+                  f"écart BSM={rel_diff:.4f}%±{rel_diff_std:.4f}%")
 
-    # Compare with BSM price
-    print(f"BSM price: {bsm_price:.4f}")
-
-    # Difference
-    print(f"Difference: {abs(price - bsm_price):.4f}, Relative Difference: {abs(price - bsm_price)/bsm_price:.4%}")
-
-    # Standard error of the Monte Carlo estimate
-    for path in [1000, 10000, 100000, 1000000]:
-        price, std_error = mc_antithetic(opt, path)
-        print(f"Standard error of Monte Carlo estimate: {std_error:.4f}, with {path} paths")
-
-    # Plot the difference as we increase the number of paths
-    path_counts = [100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000]
-    mc_diffs = [abs(mc_antithetic(opt, n)[0] - bsm_price)/bsm_price *100 for n in path_counts]
-    plt.plot(path_counts, mc_diffs, marker='o', label='Monte Carlo difference')
-    plt.xscale('log')
-    plt.xlabel('Number of Paths')
-    plt.ylabel('Relative Difference from BSM Price (%)')
-    plt.title('Monte Carlo Price Convergence')
-    plt.legend()
-    plt.savefig(REPORTS / "monte_carlo_convergence_antithetic.png")
-    plt.show()
-
-
-    print(f"----------------- Control Variate Monte Carlo pricing with {n_paths} paths -----------------")
-    price, std_error = mc_control(opt, n_paths)
-    print(f"Monte Carlo price: {price:.4f}")
-    print(f"Standard error: {std_error:.4f}")
-    # Compare with BSM price
-    print(f"BSM price: {bsm_price:.4f}")
-
-    # Difference
-    print(f"Difference: {abs(price - bsm_price):.4f}, Relative Difference: {abs(price - bsm_price)/bsm_price:.4%}")
-
-    # Standard error of the Monte Carlo estimate
-    for path in [1000, 10000, 100000, 1000000]:
-        price, std_error = mc_control(opt, path)
-        print(f"Standard error of Monte Carlo estimate: {std_error:.4f}, with {path} paths")
-
-    # Plot the difference as we increase the number of paths
-    path_counts = [100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000]
-    mc_diffs = [abs(mc_control(opt, n)[0] - bsm_price)/bsm_price *100 for n in path_counts]
-    plt.plot(path_counts, mc_diffs, marker='o', label='Monte Carlo difference')
-    plt.xscale('log')
-    plt.xlabel('Number of Paths')
-    plt.ylabel('Relative Difference from BSM Price (%)')
-    plt.title('Monte Carlo Price Convergence')
-    plt.legend()
-    plt.savefig(REPORTS / "monte_carlo_convergence_control.png")
-    plt.show()
-
-    print(f"----------------- Control and Antithetic Variate Monte Carlo pricing with {n_paths} paths -----------------")
-    price, std_error = mc_control_antithetic(opt, n_paths)
-    print(f"Monte Carlo price: {price:.4f}")
-    print(f"Standard error: {std_error:.4f}")
-    # Compare with BSM price
-    print(f"BSM price: {bsm_price:.4f}")
-
-    # Difference
-    print(f"Difference: {abs(price - bsm_price):.4f}, Relative Difference: {abs(price - bsm_price)/bsm_price:.4%}")
-
-    # Standard error of the Monte Carlo estimate
-    for path in [1000, 10000, 100000, 1000000]:
-        price, std_error = mc_control_antithetic(opt, path)
-        print(f"Standard error of Monte Carlo estimate: {std_error:.4f}, with {path} paths")
-
-    # Plot the difference as we increase the number of paths
-    path_counts = [100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000]
-    mc_diffs = [abs(mc_control_antithetic(opt, n)[0] - bsm_price)/bsm_price *100 for n in path_counts]
-    plt.plot(path_counts, mc_diffs, marker='o', label='Monte Carlo difference')
-    plt.xscale('log')
-    plt.xlabel('Number of Paths')
-    plt.ylabel('Relative Difference from BSM Price (%)')
-    plt.title('Monte Carlo Price Convergence')
-    plt.legend()
-    plt.savefig(REPORTS / "monte_carlo_convergence_control_antithetic.png")
-    plt.show()
+        plt.figure()
+        plt.errorbar(path_counts, rel_diffs, yerr=rel_diffs_std, fmt='o-',
+                     capsize=3, alpha=0.85,
+                     label=f'{label} (moyenne ± écart-type, {N_SEEDS} seeds)')
+        plt.axhline(0, color='red', ls='--', lw=0.8)
+        plt.xscale('log')
+        plt.xlabel('Number of Paths')
+        plt.ylabel('Relative Difference from BSM Price (%)\n(moyenne ± écart-type)')
+        plt.title(f'Monte Carlo Price Convergence — {label}')
+        plt.legend()
+        plt.savefig(REPORTS / f"monte_carlo_convergence_{key}.png")
+        plt.show()
