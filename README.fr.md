@@ -71,8 +71,8 @@ toutes les études (convergence, benchmarks, volatilité implicite).
 cd "Phase 1"
 streamlit run app.py
 ```
-![Interface](Phase%201/reports/streamlit.png)
-![Documentation](Phase%201/reports/documentationInterface.png)
+![Interface](Phase%201/reports/Streamlit.png)
+![Documentation](Phase%201/reports/DocumentationInterface.png)
 L'interface de l'app (mise en page, pages, identité visuelle) a été réalisée avec Claude. Construire
 un dashboard Streamlit n'est pas l'objet de ce projet, les méthodes de pricing le sont.
 

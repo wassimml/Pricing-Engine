@@ -71,8 +71,8 @@ gallery of every study (convergence, benchmarks, implied volatility).
 cd "Phase 1"
 streamlit run app.py
 ```
-![Interface](Phase%201/reports/streamlit.png)
-![Documentation](Phase%201/reports/documentationInterface.png)
+![Interface](Phase%201/reports/Streamlit.png)
+![Documentation](Phase%201/reports/DocumentationInterface.png)
 The app's interface (layout, pages, visual identity) was built with Claude. Building a
 Streamlit dashboard isn't the point of this project, pricing methods are.
 
