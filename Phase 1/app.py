@@ -22,6 +22,7 @@ with st.sidebar:
 pages = {
     "Aperçu": [
         st.Page("app_pages/accueil.py", title="Accueil", icon=":material/home:", default=True),
+        st.Page("app_pages/documentation.py", title="Documentation", icon=":material/menu_book:"),
     ],
     "Outils interactifs": [
         st.Page("app_pages/pricer.py", title="Pricer", icon=":material/calculate:"),

@@ -165,6 +165,40 @@ def inject_css() -> None:
         }}
         .carte p {{ color: {ARDOISE_CLAIR}; font-size: 0.92rem; }}
 
+        .carte-livre {{
+            display: block;
+            text-align: center;
+            padding: 1.2rem 1.2rem 1.4rem 1.2rem;
+            border-radius: 8px;
+            transition: background-color 0.15s ease, transform 0.15s ease;
+        }}
+        .carte-livre:hover {{
+            background-color: rgba(201, 168, 76, 0.10);
+            transform: translateY(-3px);
+        }}
+        .carte-livre img {{
+            box-shadow: 0 4px 16px rgba(28, 43, 58, 0.22);
+            transition: box-shadow 0.15s ease;
+        }}
+        .carte-livre:hover img {{
+            box-shadow: 0 8px 24px rgba(28, 43, 58, 0.32);
+        }}
+        .titre-livre {{
+            font-family: 'Source Serif 4', Georgia, serif;
+            color: {ARDOISE} !important;
+            font-weight: 600;
+            font-size: 1.05rem;
+            margin: 1rem 0 0.15rem 0;
+        }}
+        .carte-livre:hover .titre-livre {{
+            color: {OR} !important;
+        }}
+        .soustitre-livre {{
+            color: {GRIS_NEUTRE} !important;
+            font-size: 0.85rem;
+            margin: 0;
+        }}
+
         footer {{visibility: hidden;}}
         </style>
         """,
