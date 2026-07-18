@@ -32,7 +32,15 @@ _bs = BSModel()
 # vol, cf. pde.py). Les deux sont ici jugées de la même façon, directement
 # contre le prix marché - contrairement à benchmarkMethods.py où PDE ne joue
 # jamais que le rôle de référence pour CRR/LSM.
-AMERICANMETHODS = ["LSM", "CRR", "PDE (50,100)", "PDE (800,800)"]
+#
+# LSM apparaît ici aussi deux fois : "LSM (50,10000)" (n_paths=10000, config
+# utilisée par défaut ailleurs dans le projet, ex. benchmarkInData.py,
+# monteCarloLSM.py) et "LSM (50,20000)" (n_paths=20000, plus de paths donc en
+# principe plus stable). Contrairement à PDE (50,100)/(800,800), ce n'est pas
+# une hiérarchie calcul/référence formelle — juste deux budgets de calcul
+# comparés directement contre le marché pour voir si doubler n_paths change
+# quelque chose d'observable sur ce book précis.
+AMERICANMETHODS = ["LSM (50,10000)", "LSM (50,20000)", "CRR", "PDE (50,100)", "PDE (800,800)"]
 
 
 if __name__ == "__main__":
@@ -63,8 +71,9 @@ if __name__ == "__main__":
     # Les options SPY sont de style AMÉRICAIN (exercice anticipé possible) :
     # LSM, CRR et PDE sont donc évaluées en mode américain pour être comparables
     # au prix marché. BS n'a pas de forme fermée américaine - elle sert de
-    # référence européenne, étudiée séparément (section 9). PDE est calculée
-    # deux fois, à deux résolutions (cf. commentaire sur AMERICANMETHODS).
+    # référence européenne, étudiée séparément (section 9). PDE et LSM sont
+    # chacune calculées deux fois, à deux configs (cf. commentaire sur
+    # AMERICANMETHODS).
     def price_row(row, method):
         try:
             opt = Option(S=row["S"], K=row["strike"], T=row["T"],
@@ -73,8 +82,10 @@ if __name__ == "__main__":
                 return _bs.price(opt)
             elif method == "CRR":
                 return crr_price(opt, period=200, american=True)
-            elif method == "LSM":
+            elif method == "LSM (50,10000)":
                 return LSMoptionValue(opt, n_steps=50, n_paths=10000)
+            elif method == "LSM (50,20000)":
+                return LSMoptionValue(opt, n_steps=50, n_paths=20000)
             elif method == "PDE (50,100)":
                 return pde_crank_nicolson(opt, style="american", n_steps=50, n_space=100)
             elif method == "PDE (800,800)":
@@ -100,7 +111,6 @@ if __name__ == "__main__":
             "MAE rel (%)": np.mean(np.abs(rel)),
             "% in spread": in_spread.mean() * 100,
         }
-
     SEGMENTS = ["OTM", "ATM", "ITM"]
     KINDS    = ["call", "put"]
 
@@ -160,7 +170,7 @@ if __name__ == "__main__":
     # Note : les prints console restent ASCII-safe (pas de macron/box-drawing)
     # car la console Windows par défaut (cp1252) plante sinon sur certains
     # caractères Unicode (— et les labels des graphes, eux, les supportent).
-    print("\n- Métriques globales (méthodes américaines : LSM, CRR, PDE (50,100), PDE (800,800)) -")
+    print(f"\n- Métriques globales (méthodes américaines : {', '.join(AMERICANMETHODS)}) -")
     for method in AMERICANMETHODS:
         m = metrics(df, f"price_{method}")
         mae_n  = bidask_mae_norm(df, f"price_{method}")
@@ -234,11 +244,12 @@ if __name__ == "__main__":
     plt.savefig(REPORTS / "SPY_BS_vs_market.png", dpi=150)
     plt.show()
 
-    # - 9b. Fenêtre méthodes américaines : LSM, CRR, PDE (50,100), PDE (800,800)
+    # - 9b. Fenêtre méthodes américaines
     fig, axes = plt.subplots(2, 2, figsize=(13, 10))
-    colors_m = {"LSM": "mediumpurple", "CRR": "tomato",
+    colors_m = {"LSM (50,10000)": "plum", "LSM (50,20000)": "mediumpurple",
+                "CRR": "tomato",
                 "PDE (50,100)": "seagreen", "PDE (800,800)": "darkgreen"}
-    w = 0.2  # 4 méthodes par groupe désormais (au lieu de 3)
+    w = 0.8 / len(AMERICANMETHODS)  # largeur générique, quel que soit le nombre de méthodes
 
     ax = axes[0, 0]
     ax.bar(AMERICANMETHODS, [metrics(df, f"price_{m}")["MAE"] for m in AMERICANMETHODS],
@@ -279,21 +290,21 @@ if __name__ == "__main__":
     ax.set_ylabel("MAE relative (%)")
     ax.legend(fontsize=8)
 
-    plt.suptitle(f"SPY Options Benchmark (LSM / CRR / PDE (50,100) / PDE (800,800), style américain) - "
+    plt.suptitle(f"SPY Options Benchmark ({' / '.join(AMERICANMETHODS)}, style américain) - "
                  f"Spot ${S:.2f}  |  r={r:.1%}",
                  fontsize=13)
     plt.subplots_adjust(top=0.85)
     plt.savefig(REPORTS / "SPY_benchmark_american.png", dpi=150)
     plt.show()
 
-    # - 9c. Score de cohérence bid-ask normalisé (BS + LSM + CRR + PDE 50,100 + PDE 800,800)
+    # - 9c. Score de cohérence bid-ask normalisé (BS + toutes les méthodes américaines)
     # Nouveau graphe, distinct du "% dans le spread" ci-dessus (inchangé) :
     # le score s̄ = 1 - 2|P̂-mid|/spread pondère chaque option par la largeur
     # de son propre spread, donc n'est plus artificiellement gonflé par les
     # options illiquides à spread large (cf. review section 2.6).
     ALLMETHODS  = ["BS", *AMERICANMETHODS]
     colors_all  = {"BS": "steelblue", **colors_m}
-    w4 = 0.16  # 5 méthodes par groupe désormais (au lieu de 4)
+    w4 = 0.8 / len(ALLMETHODS)  # largeur générique, quel que soit le nombre de méthodes
 
     fig_score, axes_s = plt.subplots(2, 2, figsize=(13, 10))
 
@@ -354,4 +365,67 @@ if __name__ == "__main__":
     plt.subplots_adjust(top=0.86)
     plt.savefig(REPORTS / "SPY_bidask_score.png", dpi=150)
     plt.show()
+
+    # - 9d/9e. Évolution de l'erreur (MAE) en fonction de la volatilité et de
+    # la maturité, un subplot par méthode américaine (cf. AMERICANMETHODS) ---
+    # Complète les vues par segment de moneyness (9b) avec deux axes continus.
+    # Un subplot par méthode (plutôt que toutes les courbes superposées) pour
+    # que chacune ait sa propre échelle d'axe Y et reste lisible même quand
+    # deux méthodes sont proches (cf. CRR/PDE quasi confondus sur le graphe
+    # superposé précédent).
+    # Binning en quantiles (nombre égal d'options par bin) plutôt qu'en pas
+    # fixe de vol/T : la chaîne d'options réelle est très inégalement répartie
+    # (beaucoup d'options courtes et peu volatiles, peu d'options longues et
+    # très volatiles), un pas fixe donnerait des bins avec parfois 2-3 options
+    # et un MAE bruité au possible. Le centre de chaque bin (abscisse) est la
+    # moyenne réelle de vol/T des options qu'il contient, pas le milieu de
+    # l'intervalle - donc légèrement irrégulier sur l'axe mais fidèle aux
+    # données.
+    N_BINS = 100
+
+    def mae_by_bin(sub, price_col, bin_col, n_bins=N_BINS):
+        v = sub[[price_col, "mid", bin_col]].dropna()
+        bins = pd.qcut(v[bin_col], q=n_bins, duplicates="drop")
+        grouped = v.assign(bin=bins, abs_err=(v[price_col] - v["mid"]).abs()).groupby("bin", observed=True)
+        centers = grouped[bin_col].mean().to_numpy()
+        mae = grouped["abs_err"].mean().to_numpy()
+        counts = grouped.size().to_numpy()
+        return centers, mae, counts
+
+    def plot_mae_vs(bin_col, xlabel, suptitle, filename):
+        # Grille dynamique (pas figée à 2x2) : s'adapte au nombre de méthodes
+        # américaines (5 désormais, LSM comptant double - cf. AMERICANMETHODS).
+        n_methods = len(AMERICANMETHODS)
+        ncols = 3 if n_methods > 4 else 2
+        nrows = -(-n_methods // ncols)  # division entière arrondie au sup.
+        _, axes_e = plt.subplots(nrows, ncols, figsize=(6.5 * ncols, 5 * nrows))
+        axes_flat = np.atleast_1d(axes_e).reshape(-1)
+        for ax, method in zip(axes_flat, AMERICANMETHODS):
+            # counts (options par bin) non annoté sur le graphe à ce nombre de
+            # bins (100) — illisible en superposition, cf. décision prise à
+            # N_BINS=10->100 : chaque bin garde ~70 options (6950/100), encore
+            # un échantillon correct pour une MAE stable, juste plus bruitée
+            # bin à bin qu'à 10 bins.
+            centers, mae, _ = mae_by_bin(df, f"price_{method}", bin_col)
+            ax.plot(centers, mae, "-", lw=1, color=colors_m[method])
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel("MAE vs marché ($)")
+            ax.set_title(method)
+        for ax in axes_flat[n_methods:]:  # sous-graphes en trop (grille non pile remplie)
+            ax.axis("off")
+        plt.suptitle(f"{suptitle}\n"
+                     f"{N_BINS} bins par quantiles (échantillon égal par bin, pas un pas fixe)",
+                     fontsize=12)
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.86)
+        plt.savefig(REPORTS / filename, dpi=150)
+        plt.show()
+
+    plot_mae_vs("impliedVolatility", "Volatilité implicite (σ)",
+                "Évolution de l'erreur (MAE vs marché) en fonction de la volatilité implicite",
+                "SPY_error_vs_vol.png")
+
+    plot_mae_vs("T", "Maturité T (années)",
+                "Évolution de l'erreur (MAE vs marché) en fonction de la maturité",
+                "SPY_error_vs_maturity.png")
 

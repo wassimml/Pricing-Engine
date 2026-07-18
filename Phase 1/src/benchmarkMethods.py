@@ -17,8 +17,16 @@ REPORTS = Path(__file__).parent.parent / "reports"
 
 _bs = BSModel()
 
-# Each entry: pricer(opt, param), parameter values, style_filter (None=all,
-# 'European', 'American'), ref_kind (quelle référence sert au calcul de MAE) :
+N_SEEDS = 10    # répétitions indépendantes par (méthode, paramètre) — cf. run_method
+BASE_SEED = 0
+
+# Each entry: pricer(opt, param, style, seed), parameter values, style_filter
+# (None=all, 'European', 'American'), ref_kind (quelle référence sert au calcul
+# de MAE), stochastic (méthode aléatoire -> répétée sur N_SEEDS seeds
+# indépendants pour obtenir moyenne ± écart-type du temps et de la MAE ; CRR
+# est déterministe (même arbre binomial à chaque appel) — la répéter ne
+# changerait ni le prix ni l'information disponible, un seul passage suffit
+# (std = 0 par construction, affiché tel quel plutôt que masqué) :
 #   "BS"    : Black-Scholes fermé — pour les méthodes qui ne pricent que du
 #             européen (Monte Carlo).
 #   "PDE (800,800)"   : PDE Crank-Nicolson au style américain, outil de
@@ -30,26 +38,42 @@ _bs = BSModel()
 #             américain) pour les lignes américaines — pour CRR, qui price
 #             les deux styles à la fois.
 METHODS = {
-    "MC Naive":     (lambda opt, p, _: mc_naive(opt, n_paths=p)[0],                               [1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 200_000], "European", "BS"),
-    "MC Anti":      (lambda opt, p, _: mc_antithetic(opt, n_paths=p)[0],                          [1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 200_000], "European", "BS"),
-    "MC Control":   (lambda opt, p, _: mc_control(opt, n_paths=p)[0],                             [1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 200_000], "European", "BS"),
-    "MC Anti+Ctrl": (lambda opt, p, _: mc_control_antithetic(opt, n_paths=p)[0],                  [1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 200_000], "European", "BS"),
-    "CRR":          (lambda opt, p, style: crr_price(opt, period=p, american=(style == 'American')), [50, 100, 200, 500, 1_000],                              None,       "MIXED BS - PDE (800,800)"),
-    "LSM":          (lambda opt, p, _: LSMoptionValue(opt, n_steps=50, n_paths=p),                [1_000, 5_000, 10_000, 20_000, 25_000, 50_000],                    "American", "PDE (800,800)"),
+    "MC Naive":     (lambda opt, p, _, seed: mc_naive(opt, n_paths=p, seed=seed)[0],                       [1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 200_000], "European", "BS",                       True),
+    "MC Anti":      (lambda opt, p, _, seed: mc_antithetic(opt, n_paths=p, seed=seed)[0],                  [1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 200_000], "European", "BS",                       True),
+    "MC Control":   (lambda opt, p, _, seed: mc_control(opt, n_paths=p, seed=seed)[0],                     [1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 200_000], "European", "BS",                       True),
+    "MC Anti+Ctrl": (lambda opt, p, _, seed: mc_control_antithetic(opt, n_paths=p, seed=seed)[0],          [1_000, 5_000, 10_000, 25_000, 50_000, 100_000, 200_000], "European", "BS",                       True),
+    "CRR":          (lambda opt, p, style, _seed: crr_price(opt, period=p, american=(style == 'American')), [50, 100, 200, 500, 1_000],                              None,       "MIXED BS - PDE (800,800)", False),
+    "LSM":          (lambda opt, p, _, seed: LSMoptionValue(opt, n_steps=50, n_paths=p, seed=seed),        [1_000, 5_000, 10_000, 20_000, 25_000, 50_000],          "American", "PDE (800,800)",            True),
 }
 
-def run_method(cleanData: pd.DataFrame, pricer, params: list, style_filter):
+def run_method(cleanData: pd.DataFrame, pricer, params: list, style_filter, ref: np.ndarray, stochastic: bool,
+               n_seeds: int = N_SEEDS, base_seed: int = BASE_SEED):
+    """Pour chaque valeur de paramètre, price le book filtré une fois par seed
+    (n_seeds seeds indépendants si la méthode est stochastique, 1 seul passage
+    sinon — cf. commentaire sur METHODS) et retourne, par paramètre : temps
+    total (moyenne ± écart-type sur les seeds) et MAE vs référence (idem).
+    Une seule réalisation ne permet pas de distinguer un vrai comportement de
+    convergence d'un artefact du tirage particulier (même logique que
+    lsm_mean_std / mc_mean_std, appliquée ici au book entier plutôt qu'à une
+    option unique)."""
     rows = [r for r in cleanData.itertuples() if style_filter is None or r[7] == style_filter]
+    effective_seeds = n_seeds if stochastic else 1
     results = []
     for p in params:
-        times, prices = [], []
-        for row in rows:
-            option = Option(S=row[2], K=row[3], T=row[4], r=row[5]/100, sigma=row[6]/100, kind=row[1].lower())
+        seed_times, seed_maes = [], []
+        for s in range(effective_seeds):
+            seed = base_seed + s
             t0 = time.perf_counter()
-            price = pricer(option, p, row[7])
-            times.append(time.perf_counter() - t0)
-            prices.append(price)
-        results.append((p, sum(times), np.array(prices, dtype=float)))
+            prices = np.array([
+                pricer(Option(S=row[2], K=row[3], T=row[4], r=row[5]/100, sigma=row[6]/100, kind=row[1].lower()),
+                       p, row[7], seed)
+                for row in rows
+            ], dtype=float)
+            elapsed = time.perf_counter() - t0
+            mask = ~np.isnan(prices) & ~np.isnan(ref)
+            seed_times.append(elapsed)
+            seed_maes.append(np.mean(np.abs(prices[mask] - ref[mask])))
+        results.append((p, np.mean(seed_times), np.std(seed_times), np.mean(seed_maes), np.std(seed_maes)))
     return results
 
 def compute_reference_prices(cleanData: pd.DataFrame):
@@ -93,25 +117,32 @@ if __name__ == "__main__":
     ax = fig.add_subplot(111, projection="3d")
     colors = ["steelblue", "tomato", "seagreen", "darkorange", "mediumpurple", "saddlebrown"]
 
-    for (label, (pricer, params, style_filter, ref_kind)), color in zip(METHODS.items(), colors):
+    for (label, (pricer, params, style_filter, ref_kind, stochastic)), color in zip(METHODS.items(), colors):
         ref = select_reference(cleanData, style_filter, ref_kind, bs_all, pde_all)
-        print(f"\n--- {label} (référence : {ref_kind}) ---")
-        xs, ys, zs = [], [], []
-        for param, total_time, prices in run_method(cleanData, pricer, params, style_filter):
-            mask = ~np.isnan(prices) & ~np.isnan(ref)
-            mae = np.mean(np.abs(prices[mask] - ref[mask]))
+        n_seeds_used = N_SEEDS if stochastic else 1
+        print(f"\n--- {label} (référence : {ref_kind}, {n_seeds_used} seed{'s' if n_seeds_used > 1 else ''}) ---")
+        xs, ys, zs, y_errs, z_errs = [], [], [], [], []
+        for param, t_mean, t_std, mae_mean, mae_std in run_method(cleanData, pricer, params, style_filter, ref, stochastic):
             xs.append(param)
-            ys.append(total_time)
-            zs.append(mae)
-            print(f"  param={param:,}  time={total_time:.2f}s  MAE={mae:.4f}")
+            ys.append(t_mean)
+            zs.append(mae_mean)
+            y_errs.append(t_std)
+            z_errs.append(mae_std)
+            print(f"  param={param:,}  time={t_mean:.2f}s±{t_std:.2f}s  MAE={mae_mean:.4f}±{mae_std:.4f}")
 
         ax.plot(xs, ys, zs, marker="o", label=label, color=color)
         ax.scatter(xs, ys, zs, color=color, s=30)
+        # Écart-type sur les seeds -> barres d'erreur en z (MAE) et en y (temps),
+        # visibles directement sur le graphe plutôt que seulement dans la console.
+        for x, y, z, ye, ze in zip(xs, ys, zs, y_errs, z_errs):
+            ax.plot([x, x], [y - ye, y + ye], [z, z], color=color, alpha=0.4, lw=1.2)
+            ax.plot([x, x], [y, y], [z - ze, z + ze], color=color, alpha=0.4, lw=1.2)
 
     ax.set_xlabel("Parameter (n_paths / periods)")
     ax.set_ylabel("Total time (s)")
     ax.set_zlabel("MAE vs référence (€)")
-    ax.set_title("Accuracy vs speed — MC, CRR, LSM\n"
+    ax.set_title(f"Accuracy vs speed — MC, CRR, LSM ({N_SEEDS} seeds indépendants, moyenne ± écart-type "
+                 "; CRR déterministe -> 1 seed)\n"
                  "(référence : BS pour MC, PDE (800,800) pour LSM, BS+PDE (800,800) selon le style pour CRR)")
     ax.legend()
 

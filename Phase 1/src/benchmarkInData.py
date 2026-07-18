@@ -29,17 +29,17 @@ _bs = BSModel()
 # l'une ou l'autre selon l'endroit).
 PRICERS = {
     "BS":               lambda opt, style: _bs.price(opt) if style != 'American' else None,
-    "crr":              lambda opt, style: crr_price(opt, period=1000, american=(style == 'American')),
-    "MC Naive":         lambda opt, style: mc_naive(opt, n_paths=50000)[0] if style != 'American' else None,
+    "crr":              lambda opt, style: crr_price(opt, period=200, american=(style == 'American')),
+    "MC Naive":         lambda opt, style: mc_naive(opt, n_paths=100000)[0] if style != 'American' else None,
     "MC Anti":          lambda opt, style: mc_antithetic(opt, n_paths=100000)[0] if style != 'American' else None,
     "MC Contr":         lambda opt, style: mc_control(opt, n_paths=100000)[0] if style != 'American' else None,
     "MC Anti Contr":    lambda opt, style: mc_control_antithetic(opt, n_paths=50000)[0] if style != 'American' else None,
-    "lsm":              lambda opt, style: LSMoptionValue(opt, n_steps=50, n_paths=10000) if style == 'American' else None,
+    "lsm":              lambda opt, style: LSMoptionValue(opt, n_steps=50, n_paths=20000) if style == 'American' else None,
     "PDE (50,100)":     lambda opt, style: pde_crank_nicolson(opt, style=style.lower(), n_steps=50, n_space=100),
     "PDE (800,800)":    lambda opt, style: pde_crank_nicolson(opt, style=style.lower(), n_steps=800, n_space=800),
     "BS,PDE (50,100)":  lambda opt, style: _bs.price(opt) if style != 'American' else pde_crank_nicolson(opt, style=style.lower(), n_steps=50, n_space=100),
     "BS,PDE (800,800)": lambda opt, style: _bs.price(opt) if style != 'American' else pde_crank_nicolson(opt, style=style.lower(), n_steps=800, n_space=800),
-    "BS,crr":           lambda opt, style: _bs.price(opt) if style != 'American' else crr_price(opt, period=1000, american=True),
+    "BS,crr":           lambda opt, style: _bs.price(opt) if style != 'American' else crr_price(opt, period=200, american=True),
     "BS,lsm":           lambda opt, style: _bs.price(opt) if style != 'American' else LSMoptionValue(opt, n_steps=50, n_paths=20000),
 }
 
