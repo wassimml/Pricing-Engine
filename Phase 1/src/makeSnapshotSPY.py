@@ -68,6 +68,16 @@ if __name__ == "__main__":
     ]
     print("IV bounds >", len(df))
 
+    # - Filtre : liquidité minimale (open interest) ----------------------------
+    # Sans ce filtre, des contrats à openInterest=0 (jamais tradés) se glissent
+    # dans le book : leur bid/ask n'a plus vraiment de rapport avec un prix de
+    # marché réel, et ce sont eux qui dominent le MAE/RMSE des méthodes de
+    # pricing (cf. review du rapport Benchmark, section 2.7.2 — le point isolé
+    # de la Figure 7 était un put K=1350, T=2.44 ans, openInterest=0).
+    n_before = len(df)
+    df = df[df["openInterest"].fillna(0) >= 10]
+    print(f"Open interest >= 10 > {len(df)}  ({n_before - len(df)} écartées)")
+
     # - Moneyness -------------------------------------------------------------
     m_ratio = df["strike"] / S
     seg = pd.Series("OTM", index=df.index)

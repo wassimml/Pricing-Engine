@@ -17,18 +17,30 @@ REPORTS = Path(__file__).parent.parent / "reports"
 
 _bs = BSModel()
 
+
+# Distinction importante : "PDE (50,100)" est notre OUTIL DE CALCUL — la
+# config rapide utilisée en pratique partout ailleurs dans le projet.
+# "PDE (800,800)" est notre OUTIL DE RÉFÉRENCE — construit la vérité terrain
+# fiable. Ce sont deux configurations différentes du même schéma numérique :
+# comparer "PDE (50,100)" à "PDE (800,800)" (MAE) est donc une comparaison
+# valide, pas une tautologie. Les deux apparaissent explicitement, avec leur
+# résolution dans le nom, pour ne jamais les confondre dans les prints/graphes
+# (contrairement à avant, où le même nom générique "pde" pouvait désigner
+# l'une ou l'autre selon l'endroit).
 PRICERS = {
-    "BS":            lambda opt, style: _bs.price(opt) if style != 'American' else None,
-    "crr":           lambda opt, style: crr_price(opt, period=1000, american=(style == 'American')),
-    "MC Naive":      lambda opt, style: mc_naive(opt, n_paths=100000)[0] if style != 'American' else None,
-    "MC Anti":       lambda opt, style: mc_antithetic(opt, n_paths=100000)[0] if style != 'American' else None,
-    "MC Contr":      lambda opt, style: mc_control(opt, n_paths=100000)[0] if style != 'American' else None,
-    "MC Anti Contr": lambda opt, style: mc_control_antithetic(opt, n_paths=50000)[0] if style != 'American' else None,
-    "lsm":           lambda opt, style: LSMoptionValue(opt, n_steps=50, n_paths=10000) if style == 'American' else None,
-    "pde":           lambda opt, style: pde_crank_nicolson(opt, style=style.lower(), n_steps=200, n_space=200),
-    "BS,pde":        lambda opt, style: _bs.price(opt) if style != 'American' else pde_crank_nicolson(opt, style=style.lower(), n_steps=200, n_space=200),
-    "BS,crr":        lambda opt, style: _bs.price(opt) if style != 'American' else crr_price(opt, period=1000, american=True),
-    "BS,lsm":        lambda opt, style: _bs.price(opt) if style != 'American' else LSMoptionValue(opt, n_steps=50, n_paths=20000),
+    "BS":               lambda opt, style: _bs.price(opt) if style != 'American' else None,
+    "crr":              lambda opt, style: crr_price(opt, period=1000, american=(style == 'American')),
+    "MC Naive":         lambda opt, style: mc_naive(opt, n_paths=50000)[0] if style != 'American' else None,
+    "MC Anti":          lambda opt, style: mc_antithetic(opt, n_paths=100000)[0] if style != 'American' else None,
+    "MC Contr":         lambda opt, style: mc_control(opt, n_paths=100000)[0] if style != 'American' else None,
+    "MC Anti Contr":    lambda opt, style: mc_control_antithetic(opt, n_paths=50000)[0] if style != 'American' else None,
+    "lsm":              lambda opt, style: LSMoptionValue(opt, n_steps=50, n_paths=10000) if style == 'American' else None,
+    "PDE (50,100)":     lambda opt, style: pde_crank_nicolson(opt, style=style.lower(), n_steps=50, n_space=100),
+    "PDE (800,800)":    lambda opt, style: pde_crank_nicolson(opt, style=style.lower(), n_steps=800, n_space=800),
+    "BS,PDE (50,100)":  lambda opt, style: _bs.price(opt) if style != 'American' else pde_crank_nicolson(opt, style=style.lower(), n_steps=50, n_space=100),
+    "BS,PDE (800,800)": lambda opt, style: _bs.price(opt) if style != 'American' else pde_crank_nicolson(opt, style=style.lower(), n_steps=800, n_space=800),
+    "BS,crr":           lambda opt, style: _bs.price(opt) if style != 'American' else crr_price(opt, period=1000, american=True),
+    "BS,lsm":           lambda opt, style: _bs.price(opt) if style != 'American' else LSMoptionValue(opt, n_steps=50, n_paths=20000),
 }
 
 def calcPriceWithMethod(cleanData: pd.DataFrame, method: str):
@@ -92,24 +104,33 @@ if __name__ == "__main__":
     cleanData_eu = cleanData[cleanData['Style'] != 'American']
     cleanData_am = cleanData[cleanData['Style'] == 'American']
 
-    # References
-    print("Computing references...")
-    _, ref_bs_eu   = calcPriceWithMethod(cleanData_eu, "BS")        # exact for European
-    _, ref_pde_am  = calcPriceWithMethod(cleanData_am, "pde")       # reference for American
-    _, ref_bspde   = calcPriceWithMethod(cleanData,    "BS,pde")    # BS(EU) + PDE(AM) for full book
+    # References — toujours construites avec l'outil de référence (n=800),
+    # jamais avec l'outil de calcul (n=50/100) : cf. commentaire au-dessus de
+    # PRICERS. Les noms "PDE (50,100)" / "PDE (800,800)" rendent la résolution
+    # explicite partout, plus de nom générique ambigu "pde".
+    print("Computing references (outil de reference : PDE n_steps=800, n_space=800)...")
+    _, ref_bs_eu   = calcPriceWithMethod(cleanData_eu, "BS")                 # exact for European
+    _, ref_pde_am  = calcPriceWithMethod(cleanData_am, "PDE (800,800)")      # reference for American
+    _, ref_bspde   = calcPriceWithMethod(cleanData,    "BS,PDE (800,800)")   # BS(EU) + PDE ref(AM) for full book
     ref_bs_eu  = np.array(ref_bs_eu,  dtype=float)
     ref_pde_am = np.array(ref_pde_am, dtype=float)
     ref_bspde  = np.array(ref_bspde,  dtype=float)
 
-    # Figure 1 — American options (référence = pde -> exclu du graphe MAE)
+    # Figure 1 — American options (référence = PDE (800,800)).
+    # "PDE (50,100)" (outil de calcul) ET "PDE (800,800)" (outil de référence)
+    # sont TOUS LES DEUX affichés dans le graphe de temps, pour qu'on voie
+    # explicitement le coût de chacun. "PDE (800,800)" reste exclu du graphe
+    # de MAE (comparaison à elle-même, trivialement nulle) ; "PDE (50,100)"
+    # y est inclus car ce n'est pas le même calcul que la référence — erreur
+    # réelle et informative de la config rapide utilisée en pratique.
     print("\n--- American options ---")
     plot_figure(
         title="American options",
-        methods=["lsm", "crr", "pde"],
-        mae_methods=["lsm", "crr"],
+        methods=["lsm", "crr", "PDE (50,100)", "PDE (800,800)"],
+        mae_methods=["lsm", "crr", "PDE (50,100)"],
         data_subset=cleanData_am,
         ref=ref_pde_am,
-        ref_label="PDE",
+        ref_label="PDE ref (n_steps=800, n_space=800)",
         bar_color="tomato",
         filename="benchmark_american.png",
     )
@@ -118,8 +139,8 @@ if __name__ == "__main__":
     print("\n--- European options ---")
     plot_figure(
         title="European options",
-        methods=["BS", "MC Naive", "MC Anti", "MC Contr", "MC Anti Contr", "crr", "pde"],
-        mae_methods=["MC Naive", "MC Anti", "MC Contr", "MC Anti Contr", "crr", "pde"],
+        methods=["BS", "MC Naive", "MC Anti", "MC Contr", "MC Anti Contr", "crr", "PDE (50,100)"],
+        mae_methods=["MC Naive", "MC Anti", "MC Contr", "MC Anti Contr", "crr", "PDE (50,100)"],
         data_subset=cleanData_eu,
         ref=ref_bs_eu,
         ref_label="BS",
@@ -127,15 +148,23 @@ if __name__ == "__main__":
         filename="benchmark_european.png",
     )
 
-    # Figure 3 — Full book (both styles) + combinations (référence = BS,pde -> exclu du graphe MAE)
+    # Figure 3 — Full book (both styles) + combinations (référence = BS,PDE (800,800)).
+    # "BS,PDE (50,100)" (outil de calcul, PDE 50/100 pour le volet américain)
+    # ET "BS,PDE (800,800)" (outil de référence) sont tous les deux affichés
+    # dans le graphe de temps, pour voir explicitement le coût de chacun.
+    # "BS,PDE (800,800)" reste exclu du graphe de MAE (comparaison à
+    # elle-même, trivialement nulle). Attention à l'interprétation du temps
+    # d'exécution : "BS,PDE (50,100)" doit être rapide ; si un graphe montre
+    # une combinaison "BS+PDE" très lente sans préciser (50,100) ou (800,800)
+    # en légende, c'est le signe d'une confusion entre les deux configs.
     print("\n--- Full book ---")
     plot_figure(
         title="Full book — both styles",
-        methods=["crr", "pde", "BS,pde", "BS,crr", "BS,lsm"],
-        mae_methods=["crr", "pde", "BS,crr", "BS,lsm"],
+        methods=["crr", "PDE (50,100)", "BS,PDE (50,100)", "BS,PDE (800,800)", "BS,crr", "BS,lsm"],
+        mae_methods=["crr", "PDE (50,100)", "BS,PDE (50,100)", "BS,crr", "BS,lsm"],
         data_subset=cleanData,
         ref=ref_bspde,
-        ref_label="BS+PDE",
+        ref_label="BS + PDE ref (n_steps=800, n_space=800)",
         bar_color="seagreen",
         filename="benchmark_fullbook.png",
     )

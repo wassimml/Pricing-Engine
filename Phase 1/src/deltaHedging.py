@@ -22,8 +22,8 @@ if __name__ == "__main__":
           f"Time to Maturity: {T_weeks/52:.2f} years ({T_weeks} weeks), "
           f"Risk-free Rate: {r}, Volatility: {sigma}, Number of Calls: {total_Calls}")
     print(f"{'Week':>4} | {'Stock Price':>11} | {'Option Price':>12} | "
-          f"{'Delta':>6} | {'Shares Held':>11} | {'Change':>10} | {'Cash':>12}")
-    print("-" * 85)
+          f"{'Delta':>6} | {'Shares Held':>11} | {'Change':>10} | {'Cash':>12} | {'Interest':>10}")
+    print("-" * 100)
 
     # Simulate the stock price path using GBM
     rng = np.random.default_rng(42)
@@ -41,11 +41,20 @@ if __name__ == "__main__":
     cash = initial_bs_price * total_Calls - shares_held * S[0]  # prime reçue - coût des actions
 
     print(f"{0:>4} | {S[0]:>11.2f} | {initial_bs_price:>12.4f} | "
-          f"{first_delta:>6.4f} | {shares_held:>11.2f} | {'':>10} | {cash:>12.2f}")
+          f"{first_delta:>6.4f} | {shares_held:>11.2f} | {'':>10} | {cash:>12.2f} | {'':>10}")
+
+    # Intérêts versés (cash < 0, on emprunte) — cumul distinct des intérêts perçus (cash > 0)
+    total_interest_paid = 0.0
+    total_interest_earned = 0.0
 
     # t=1 à T-1 : rééquilibrages hebdomadaires
     for t in range(1, T_weeks):
-        cash *= np.exp(r * dt)  # intérêts sur le cash
+        interest = cash * (np.exp(r * dt) - 1)  # intérêts sur le cash de la semaine écoulée
+        cash += interest
+        if interest < 0:
+            total_interest_paid += -interest
+        else:
+            total_interest_earned += interest
 
         current_option = Option(S=S[t], K=K, T=(T_weeks - t) / 52, r=r, sigma=sigma, kind='call')
         current_price = BSModel().price(current_option)
@@ -57,16 +66,22 @@ if __name__ == "__main__":
         shares_held = new_shares
 
         print(f"{t:>4} | {S[t]:>11.2f} | {current_price:>12.4f} | "
-              f"{current_delta:>6.4f} | {shares_held:>11.2f} | {shares_change:>10.2f} | {cash:>12.2f}")
+              f"{current_delta:>6.4f} | {shares_held:>11.2f} | {shares_change:>10.2f} | {cash:>12.2f} | {interest:>10.2f}")
 
     # t=T : maturité
-    cash *= np.exp(r * dt)
+    interest = cash * (np.exp(r * dt) - 1)
+    cash += interest
+    if interest < 0:
+        total_interest_paid += -interest
+    else:
+        total_interest_earned += interest
+
     final_payoff_per_call = max(S[-1] - K, 0)
     final_delta = 1.0 if S[-1] > K else 0.0
 
     print(f"{T_weeks:>4} | {S[-1]:>11.2f} | {final_payoff_per_call:>12.4f} | "
-          f"{final_delta:>6.1f} | {shares_held:>11.2f} | {'':>10} | {cash:>12.2f}")
-    print("-" * 85)
+          f"{final_delta:>6.1f} | {shares_held:>11.2f} | {'':>10} | {cash:>12.2f} | {interest:>10.2f}")
+    print("-" * 100)
 
     # P&L final
     payoff_total = final_payoff_per_call * total_Calls
@@ -77,6 +92,8 @@ if __name__ == "__main__":
     print(f"Portfolio value at maturity : {portfolio_value:>10.2f}€")
     print(f"Payoff to deliver           : {payoff_total:>10.2f}€")
     print(f"P&L                         : {pnl:>10.2f}€")
+    print(f"Total interest paid (borrowing) : {total_interest_paid:>10.2f}€")
+    print(f"Total interest earned            : {total_interest_earned:>10.2f}€")
     if pnl > 0:
         print(f"Payoff to deliver : {payoff_total:>10.2f}€  →  Hedging P&L : +{pnl:>10.2f}€  ✓ Gain")
     else:

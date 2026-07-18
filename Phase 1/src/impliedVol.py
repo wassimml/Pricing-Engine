@@ -121,7 +121,7 @@ def implied_volatility_PDE(market_price: float, S: float, K: float, T: float, r:
     """
     def objective(sigma):
         opt = Option(S=S, K=K, T=T, r=r, sigma=sigma, kind=option_type)
-        return pde_crank_nicolson(opt, style="american", n_steps=200, n_space=200) - market_price
+        return pde_crank_nicolson(opt, style="american", n_steps=800, n_space=800) - market_price
 
     sigma_min = 1e-2
     f_low = objective(sigma_min)

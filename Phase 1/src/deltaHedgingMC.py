@@ -52,9 +52,15 @@ def simulate_delta_hedging_mc(
         shares_held = first_delta * Initial_Calls
         cash = initial_premium - shares_held * S[0]
 
+        # Intérêts versés (cash < 0, on emprunte) pour cette simulation
+        interest_paid = 0.0
+
         # t=1 à n_steps-1
         for t in range(1, n_steps):
-            cash *= np.exp(r * dt)
+            interest = cash * (np.exp(r * dt) - 1)
+            cash += interest
+            if interest < 0:
+                interest_paid += -interest
             T_remaining = max(T - t * dt, 1e-10)
             current_option = Option(S=S[t], K=K, T=T_remaining, r=r, sigma=sigma, kind='call')
             current_delta = BSGreeks(current_option).delta()
@@ -63,7 +69,11 @@ def simulate_delta_hedging_mc(
             shares_held = new_shares
 
         # maturité
-        cash *= np.exp(r * dt)
+        interest = cash * (np.exp(r * dt) - 1)
+        cash += interest
+        if interest < 0:
+            interest_paid += -interest
+
         payoff_total = max(S[-1] - K, 0) * Initial_Calls
         portfolio_value = cash + shares_held * S[-1]
         pnl = portfolio_value - payoff_total
@@ -74,6 +84,7 @@ def simulate_delta_hedging_mc(
             'payoff': payoff_total,
             'portfolio_value': portfolio_value,
             'pnl': pnl,
+            'interest_paid': interest_paid,
             'itm': S[-1] > K
         })
 
@@ -131,6 +142,7 @@ def plot_comparison(df_weekly: pd.DataFrame, df_daily: pd.DataFrame,
     print(f"  {'Initial premium':30} {initial_premium:>10.2f}€")
     print(f"  {'Mean P&L':30} {df_weekly['pnl'].mean():>10.2f}€ {df_daily['pnl'].mean():>10.2f}€")
     print(f"  {'Std P&L':30} {df_weekly['pnl'].std():>10.2f}€ {df_daily['pnl'].std():>10.2f}€")
+    print(f"  {'Mean interest paid (borrowing)':30} {df_weekly['interest_paid'].mean():>10.2f}€ {df_daily['interest_paid'].mean():>10.2f}€")
     print(f"  {'Min P&L':30} {df_weekly['pnl'].min():>10.2f}€ {df_daily['pnl'].min():>10.2f}€")
     print(f"  {'Max P&L':30} {df_weekly['pnl'].max():>10.2f}€ {df_daily['pnl'].max():>10.2f}€")
     print(f"  {'P&L > 0 (%)':30} {100*(df_weekly['pnl']>0).mean():>10.1f}% {100*(df_daily['pnl']>0).mean():>10.1f}%")

@@ -35,30 +35,30 @@ Implémentation des fondations de la valorisation d'options vanilles.
 
 Extension vers des modèles à volatilité non constante.
 
-- 2.1 Surface de volatilité implicite
-- 2.2 Modèle de Heston - Carr-Madan pricing
-- 2.3 Calibration Heston - Differential evolution
-- 2.4 Modèle SABR - Formule d'Hagan
-- 2.5 Confrontation au marché réel (SPY) : réduction de l'écart vs Phase 1
+- Surface de volatilité implicite
+- Modèle de Heston - Carr-Madan pricing
+- Calibration Heston - Differential evolution
+- Modèle SABR - Formule d'Hagan
+- Confrontation au marché réel (SPY) : réduction de l'écart vs Phase 1
 
 ## Phase 3 - Taux d'intérêt stochastique *(à venir)*
 
 Modélisation de la structure par termes des taux et couplage avec le sous-jacent.
 
-- 3.1 Modèle de Vasicek : taux stochastique mean-reverting
-- 3.2 Modèle Cox-Ingersoll-Ross (CIR)
-- 3.3 Couplage taux/sous-jacent : modèle SVSI
-- 3.4 Confrontation au marché réel : options longue maturité
+- Modèle de Vasicek : taux stochastique mean-reverting
+- Modèle Cox-Ingersoll-Ross (CIR)
+- Couplage taux/sous-jacent : modèle SVSI
+- Confrontation au marché réel : options longue maturité
 
 ## Phase 4 - Vol Surface Arbitrage Lab *(à venir)*
 
 Analyse de la surface et détection d'incohérences de pricing.
 
-- 4.1 Absence d'arbitrage - Détection calendar & butterfly
-- 4.2 Volatilité locale de Dupire
-- 4.3 Greeks de second ordre - Vanna, Volga, Charm
-- 4.4 P&L Explain
-- 4.5 Stress tests + dashboard final
+- Absence d'arbitrage - Détection calendar & butterfly
+- Volatilité locale de Dupire
+- Greeks de second ordre - Vanna, Volga, Charm
+- P&L Explain
+- Stress tests + dashboard final
 
 ---
 

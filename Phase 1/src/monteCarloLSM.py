@@ -85,8 +85,8 @@ if __name__ == "__main__":
     N_SEEDS = 25  # répétitions indépendantes par configuration
 
     # ── Étape 1 : référence fiable via PDE Crank-Nicolson ──
-    reference_price = pde_crank_nicolson(option, style='american', n_steps=500, n_space=500)
-    print(f"Prix de référence (PDE Crank-Nicolson, N=500x500): {reference_price:.4f}\n")
+    reference_price = pde_crank_nicolson(option, style='american', n_steps=800, n_space=800)
+    print(f"Prix de référence (PDE Crank-Nicolson, N=800x800): {reference_price:.4f}\n")
 
     # ── Étape 2 : convergence de LSM en fonction de n_paths (n_steps fixé) ──
     n_steps_lsm = 50
