@@ -10,14 +10,14 @@ Personal project built alongside a derivatives course (Ensimag 2A), drawing on *
 
 | Phase | Content | Status |
 |-------|---------|--------|
-| **Phase 1** | Black-Scholes, Greeks, CRR, Monte Carlo & PDE | In progress |
-| **Phase 2** | Stochastic Volatility - Heston & SABR | In progress |
+| **Phase 1** | Black-Scholes, Greeks, CRR, Monte Carlo & PDE | Almost done (95%) |
+| **Phase 2** | Stochastic Volatility - Heston & SABR | In progress (0%) |
 | **Phase 3** | Stochastic Interest Rates - Vasicek, CIR & SVSI | Coming soon |
 | **Phase 4** | Vol Surface Arbitrage Lab | Coming soon |
 
 ---
 
-## Phase 1 - Black-Scholes, Greeks & Monte Carlo
+## Phase 1 - Black-Scholes, Greeks & Monte Carlo *(almost done, 95%)*
 
 Implementation of the foundations of vanilla option pricing.
 
@@ -31,7 +31,7 @@ Implementation of the foundations of vanilla option pricing.
 - Implied volatility inversion via Brent's method - BS, CRR, LSM & PDE, with smile and 3D surface on real AAPL data
 - LSM / CRR / PDE (American) vs BS baseline, benchmarked on real SPY market data
 
-## Phase 2 - Stochastic Volatility
+## Phase 2 - Stochastic Volatility *(in progress, 0%)*
 
 Extension towards non-constant volatility models.
 

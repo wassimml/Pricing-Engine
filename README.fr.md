@@ -10,14 +10,14 @@ Projet personnel conduit en marge d'un cours de produits dérivés (Ensimag 2A),
 
 | Phase | Contenu | Statut |
 |-------|---------|--------|
-| **Phase 1** | Black-Scholes, Greeks, CRR, Monte Carlo & PDE | En cours |
-| **Phase 2** | Volatilité stochastique - Heston & SABR | En cours |
+| **Phase 1** | Black-Scholes, Greeks, CRR, Monte Carlo & PDE | Presque fini (95%) |
+| **Phase 2** | Volatilité stochastique - Heston & SABR | En cours (0%) |
 | **Phase 3** | Taux d'intérêt stochastique - Vasicek, CIR & SVSI | À venir |
 | **Phase 4** | Vol Surface Arbitrage Lab | À venir |
 
 ---
 
-## Phase 1 - Black-Scholes, Greeks & Monte Carlo
+## Phase 1 - Black-Scholes, Greeks & Monte Carlo *(presque fini, 95%)*
 
 Implémentation des fondations de la valorisation d'options vanilles.
 
@@ -31,7 +31,7 @@ Implémentation des fondations de la valorisation d'options vanilles.
 - Inversion de volatilité implicite par la méthode de Brent - BS, CRR, LSM & PDE, avec smile et surface 3D sur données réelles AAPL
 - LSM / CRR / PDE (américain) vs référence BS, confrontés aux données réelles du marché SPY
 
-## Phase 2 - Volatilité stochastique
+## Phase 2 - Volatilité stochastique *(en cours, 0%)*
 
 Extension vers des modèles à volatilité non constante.
 
