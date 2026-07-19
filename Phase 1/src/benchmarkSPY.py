@@ -4,11 +4,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
 
-# Import all methods
-from option import Option
-from binomial import crr_price
-from monteCarloLSM import LSMoptionValue
-from pde import pde_crank_nicolson
+# Import all methods (versions optimisées - cf. binomial.py/monteCarloLSM.py/
+# pde.py/BSpricer.py pour le détail de chaque levier et sa justification
+# empirique : vectorisation pour BS/CRR, multiprocess pour LSM, décision
+# auto séquentiel/parallèle selon le coût réel pour PDE)
+from binomial import crr_price_fast
+from monteCarloLSM import LSMoptionValue_parallel
+from pde import pde_crank_nicolson_auto
 from BSpricer import BSModel
 
 DATA = Path(__file__).parent.parent / "data"
@@ -67,35 +69,49 @@ if __name__ == "__main__":
     plt.savefig(REPORTS / "SPY_historical_closing_price.png", dpi=150)
     plt.show()
 
-    # - 6. Pricing ------------------------------─
+    # - 6. Pricing (vectorisé/parallélisé - cf. imports) -----------------------
     # Les options SPY sont de style AMÉRICAIN (exercice anticipé possible) :
     # LSM, CRR et PDE sont donc évaluées en mode américain pour être comparables
     # au prix marché. BS n'a pas de forme fermée américaine - elle sert de
     # référence européenne, étudiée séparément (section 9). PDE et LSM sont
     # chacune calculées deux fois, à deux configs (cf. commentaire sur
     # AMERICANMETHODS).
-    def price_row(row, method):
-        try:
-            opt = Option(S=row["S"], K=row["strike"], T=row["T"],
-                         r=row["r"], sigma=row["impliedVolatility"], kind=row["kind"])
-            if method == "BS":
-                return _bs.price(opt)
-            elif method == "CRR":
-                return crr_price(opt, period=200, american=True)
-            elif method == "LSM (50,10000)":
-                return LSMoptionValue(opt, n_steps=50, n_paths=10000)
-            elif method == "LSM (50,20000)":
-                return LSMoptionValue(opt, n_steps=50, n_paths=20000)
-            elif method == "PDE (50,100)":
-                return pde_crank_nicolson(opt, style="american", n_steps=50, n_space=100)
-            elif method == "PDE (800,800)":
-                return pde_crank_nicolson(opt, style="american", n_steps=800, n_space=800)
-        except Exception:
-            return np.nan
+    #
+    # Toutes les fonctions ci-dessous pricent le book ENTIER en un seul appel
+    # (BS/CRR vectorisés NumPy, LSM/PDE(800,800) parallélisés multi-process,
+    # PDE(50,100) reste séquentiel via la décision auto - trop rapide par
+    # option pour que la parallélisation soit rentable, cf. pde.py) au lieu
+    # d'une boucle Python par ligne (df.apply) - déterminant sur un book de
+    # cette taille (6950+ lignes).
+    S_arr     = df["S"].to_numpy()
+    K_arr     = df["strike"].to_numpy()
+    T_arr     = df["T"].to_numpy()
+    r_arr     = df["r"].to_numpy()
+    sigma_arr = df["impliedVolatility"].to_numpy()
+    kind_arr  = df["kind"].to_numpy()
+    american_arr = np.ones(len(df), dtype=bool)  # toutes les options SPY sont américaines
 
-    for method in ["BS", *AMERICANMETHODS]:
-        print(f"Pricing {method}...")
-        df[f"price_{method}"] = df.apply(lambda row: price_row(row, method), axis=1)
+    print("Pricing BS...")
+    df["price_BS"] = _bs.price_batch(S_arr, K_arr, T_arr, r_arr, sigma_arr, kind_arr)
+
+    print("Pricing CRR...")
+    df["price_CRR"] = crr_price_fast(S_arr, K_arr, T_arr, r_arr, sigma_arr, kind_arr, american_arr, period=200)
+
+    print("Pricing LSM (50,10000)...")
+    df["price_LSM (50,10000)"] = LSMoptionValue_parallel(
+        S_arr, K_arr, T_arr, r_arr, sigma_arr, kind_arr, n_steps=50, n_paths=10000, seed=42)
+
+    print("Pricing LSM (50,20000)...")
+    df["price_LSM (50,20000)"] = LSMoptionValue_parallel(
+        S_arr, K_arr, T_arr, r_arr, sigma_arr, kind_arr, n_steps=50, n_paths=20000, seed=42)
+
+    print("Pricing PDE (50,100)...")
+    df["price_PDE (50,100)"] = pde_crank_nicolson_auto(
+        S_arr, K_arr, T_arr, r_arr, sigma_arr, kind_arr, american_arr, n_steps=50, n_space=100)
+
+    print("Pricing PDE (800,800)...")
+    df["price_PDE (800,800)"] = pde_crank_nicolson_auto(
+        S_arr, K_arr, T_arr, r_arr, sigma_arr, kind_arr, american_arr, n_steps=800, n_space=800)
 
     # - 7. Métriques ----------------------------─
     def metrics(sub, price_col):

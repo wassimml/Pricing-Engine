@@ -2,6 +2,7 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+from concurrent.futures import ProcessPoolExecutor
 
 from option import Option
 from pde import pde_crank_nicolson
@@ -62,6 +63,66 @@ def LSMoptionValue(option, n_steps=50, n_paths=4096, seed=42):
 
     V0 = np.sum(V[1, :] * df) / n_paths  # LSM estimator
     return V0
+
+
+# ---------------------------------------------------------------------------
+# Version parallèle : LSM est intrinsèquement séquentiel PAR OPTION (chaque
+# pas de temps a besoin de la régression du pas suivant) et doit garder tout
+# l'historique des trajectoires en mémoire (n_options x n_steps x n_paths) —
+# contrairement à CRR (largeur bornée par `period`, jamais plus de ~16 Mo),
+# une vectorisation cross-options exploserait la RAM aux paramètres réalistes
+# du sweep (ex. n_steps=200, n_paths=50000, ~900 options américaines ->
+# ~160 Go). Le vrai levier ici : chaque option est indépendante des autres,
+# donc parallélisable sur plusieurs cœurs CPU plutôt que vectorisée.
+#
+# Sur Windows, multiprocessing utilise spawn (pas fork) : chaque process
+# redémarre avec un coût réel, donc on découpe le book en `n_workers` LOTS
+# (un par cœur) plutôt qu'un process par option, pour amortir ce coût.
+# ---------------------------------------------------------------------------
+
+def _lsm_chunk(args):
+    """Worker : price séquentiellement un lot d'options en LSM (même code que
+    LSMoptionValue). Doit être une fonction top-level (picklable) pour
+    fonctionner avec ProcessPoolExecutor sous Windows (spawn)."""
+    S, K, T, r, sigma, kind, n_steps, n_paths, seed = args
+    prices = np.empty(len(S))
+    for i in range(len(S)):
+        opt = Option(S=S[i], K=K[i], T=T[i], r=r[i], sigma=sigma[i], kind=kind[i])
+        prices[i] = LSMoptionValue(opt, n_steps=n_steps, n_paths=n_paths, seed=seed)
+    return prices
+
+
+def LSMoptionValue_parallel(S, K, T, r, sigma, kind, n_steps=50, n_paths=4096, seed=42, n_workers=8):
+    """Price tout un book en LSM en parallélisant sur plusieurs process.
+    S/K/T/r/sigma/kind : array-like, shape (n_options,). Retourne un array de
+    prix, shape (n_options,). À appeler uniquement sous une garde
+    `if __name__ == "__main__":` (contrainte de multiprocessing sous
+    Windows).
+
+    n_workers=8 par défaut (pas os.cpu_count()) : sous Windows, spawn
+    réimporte tout le script __main__ appelant (matplotlib, pandas, QuantLib
+    inclus via ce module) dans CHAQUE process — à 16-20 workers simultanés,
+    ça peut épuiser le fichier de pagination ("insufficient paging file")
+    même sur une machine avec beaucoup de cœurs. 8 workers donne encore
+    l'essentiel du gain (3.26x mesuré vs 3.71x à 16) avec une pression
+    mémoire deux fois moindre."""
+    S, K, T, r, sigma = (np.asarray(x, dtype=float) for x in (S, K, T, r, sigma))
+    kind = np.asarray(kind)
+    n = len(S)
+    n_workers = min(n_workers, n)
+
+    bounds = np.linspace(0, n, n_workers + 1, dtype=int)
+    chunks = [
+        (S[bounds[i]:bounds[i+1]], K[bounds[i]:bounds[i+1]], T[bounds[i]:bounds[i+1]],
+         r[bounds[i]:bounds[i+1]], sigma[bounds[i]:bounds[i+1]], kind[bounds[i]:bounds[i+1]],
+         n_steps, n_paths, seed)
+        for i in range(n_workers) if bounds[i + 1] > bounds[i]
+    ]
+
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        results = list(executor.map(_lsm_chunk, chunks))
+
+    return np.concatenate(results)
 
 
 def lsm_mean_std(option, n_steps, n_paths, n_seeds, base_seed=0):

@@ -38,6 +38,19 @@ class BSModel:
             return spots * norm.cdf(d1) - opt.K * disc * norm.cdf(d2)
         return opt.K * disc * norm.cdf(-d2) - spots * norm.cdf(-d1)
 
+    def price_batch(self, S, K, T, r, sigma, kind) -> np.ndarray:
+        """Vectorised BSM price over a whole book at once (S, K, T, r, sigma,
+        kind all array-like, shape (n_options,)). Closed-form and O(1) per
+        option, so the whole book prices in a single NumPy pass instead of
+        one Python call per row — this is BS's "peak performance" mode."""
+        S, K, T, r, sigma = (np.asarray(x, dtype=float) for x in (S, K, T, r, sigma))
+        kind = np.asarray(kind)
+        d1, d2 = self._d1_d2(S, K, T, r, sigma)
+        disc = np.exp(-r * T)
+        call_price = S * norm.cdf(d1) - K * disc * norm.cdf(d2)
+        put_price  = K * disc * norm.cdf(-d2) - S * norm.cdf(-d1)
+        return np.where(kind == 'call', call_price, put_price)
+
     def check_put_call_parity(self, opt: Option, tol: float = 1e-8) -> tuple:
         call = self.price(Option(opt.S, opt.K, opt.T, opt.r, opt.sigma, 'call'))
         put  = self.price(Option(opt.S, opt.K, opt.T, opt.r, opt.sigma, 'put'))

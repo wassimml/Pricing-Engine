@@ -11,7 +11,7 @@ Projet personnel conduit en marge d'un cours de produits dérivés (Ensimag 2A),
 | Phase | Contenu | Statut |
 |-------|---------|--------|
 | **Phase 1** | Black-Scholes, Greeks, CRR, Monte Carlo & PDE | En cours |
-| **Phase 2** | Volatilité stochastique - Heston & SABR | À venir |
+| **Phase 2** | Volatilité stochastique - Heston & SABR | En cours |
 | **Phase 3** | Taux d'intérêt stochastique - Vasicek, CIR & SVSI | À venir |
 | **Phase 4** | Vol Surface Arbitrage Lab | À venir |
 
@@ -28,10 +28,10 @@ Implémentation des fondations de la valorisation d'options vanilles.
 - Arbre binomial CRR
 - Longstaff-Schwartz LSM - régression polynomiale d'ordre 3
 - PDE - Crank-Nicolson
-- Volatilité implicite par Newton-Raphson 
-- Benchmark BS / MC / LSM / CRR / PDE sur données réelles SPY **(En cours)**
+- Inversion de volatilité implicite par la méthode de Brent - BS, CRR, LSM & PDE, avec smile et surface 3D sur données réelles AAPL
+- LSM / CRR / PDE (américain) vs référence BS, confrontés aux données réelles du marché SPY
 
-## Phase 2 - Volatilité stochastique *(à venir)*
+## Phase 2 - Volatilité stochastique
 
 Extension vers des modèles à volatilité non constante.
 
@@ -109,6 +109,7 @@ Options Pricing Engine/
 │   │   ├── impliedVol.py        # Inversion de vol implicite (BS/CRR/LSM/PDE) + smile & surface (AAPL)
 │   │   ├── timeValue.py         # Étude de la valeur temps (BS, surface 3D spot x maturité)
 │   │   ├── benchmarkMethods.py  # Précision/vitesse vs balayage de paramètres (3D)
+│   │   ├── generateOptionsBook.py # Génère le book synthétique reproductible (~2000 options)
 │   │   ├── benchmarkInData.py   # Benchmark de toutes les méthodes sur ~2000 options synthétiques
 │   │   ├── benchmarkSPY.py      # Benchmark LSM/CRR/PDE face aux données réelles SPY
 │   │   ├── makeSnapshotSPY.py   # Génère un snapshot reproductible d'options SPY

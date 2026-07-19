@@ -1,5 +1,6 @@
 from pathlib import Path
 import time
+from concurrent.futures import ProcessPoolExecutor
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -43,9 +44,114 @@ def pde_crank_nicolson(option: Option, style: str = 'american', n_steps: int = 2
         exercise = ql.EuropeanExercise(maturity)
 
     vanilla = ql.VanillaOption(payoff, exercise)
-    # FdBlackScholesVanillaEngine uses ql.FdmSchemeDesc.Douglas() per default. 
+    # FdBlackScholesVanillaEngine uses ql.FdmSchemeDesc.Douglas() per default.
     vanilla.setPricingEngine(ql.FdBlackScholesVanillaEngine(process, n_steps, n_space, 2, ql.FdmSchemeDesc.CrankNicolson()))
     return vanilla.NPV()
+
+
+# ---------------------------------------------------------------------------
+# Version parallèle : comme LSM (cf. monteCarloLSM.py), QuantLib n'offre
+# aucun moyen de pricer plusieurs options en un seul appel batché côté
+# Python — chaque option nécessite sa propre résolution EDP indépendante via
+# les bindings SWIG. Le seul levier est donc la parallélisation multi-process
+# (chaque option est indépendante des autres), PAS la vectorisation.
+#
+# Contrairement à LSM cependant, le coût par option dépend énormément de
+# (n_steps, n_space) : mesuré ~0.5 ms/option à (50,100) contre ~29 ms/option
+# à (800,800) — un facteur ~60. En dessous d'un certain volume de calcul
+# total, le coût de démarrage des process (spawn sous Windows) domine
+# largement et paralléliser est contre-productif (même constat qu'avec LSM
+# sur petit échantillon) ; au-dessus, ça aide vraiment. Plutôt que de figer
+# ça en dur pour des couples (n_steps, n_space) particuliers,
+# pde_crank_nicolson_auto ci-dessous MESURE le coût réel (une sonde sur une
+# option) et décide dynamiquement — valable pour n'importe quelle résolution,
+# pas seulement (50,100) et (800,800).
+# ---------------------------------------------------------------------------
+
+def _pde_chunk(args):
+    """Worker : price séquentiellement un lot d'options en PDE (même code que
+    pde_crank_nicolson). Doit être une fonction top-level (picklable) pour
+    fonctionner avec ProcessPoolExecutor sous Windows (spawn)."""
+    S, K, T, r, sigma, kind, american, n_steps, n_space = args
+    prices = np.empty(len(S))
+    for i in range(len(S)):
+        opt = Option(S=S[i], K=K[i], T=T[i], r=r[i], sigma=sigma[i], kind=kind[i])
+        style = 'american' if american[i] else 'european'
+        prices[i] = pde_crank_nicolson(opt, style=style, n_steps=n_steps, n_space=n_space)
+    return prices
+
+
+def pde_crank_nicolson_parallel(S, K, T, r, sigma, kind, american, n_steps=200, n_space=200, n_workers=8):
+    """Price tout un book en PDE Crank-Nicolson en parallélisant sur plusieurs
+    process. S/K/T/r/sigma/kind/american : array-like, shape (n_options,) —
+    `american` (bool) contrôle le style par ligne, mélange possible dans le
+    même appel. Retourne un array de prix, shape (n_options,). À appeler
+    uniquement sous une garde `if __name__ == "__main__":` (contrainte de
+    multiprocessing sous Windows).
+
+    n_workers=8 par défaut (pas os.cpu_count()) : sous Windows, spawn
+    réimporte tout le script __main__ appelant (matplotlib, pandas, QuantLib)
+    dans CHAQUE process — à 16-20 workers simultanés, ça peut épuiser le
+    fichier de pagination ("insufficient paging file") même sur une machine
+    avec beaucoup de cœurs. 8 workers garde l'essentiel du gain (3.62x
+    mesuré vs 4.99x à 16) avec une pression mémoire deux fois moindre."""
+    S, K, T, r, sigma = (np.asarray(x, dtype=float) for x in (S, K, T, r, sigma))
+    kind = np.asarray(kind)
+    american = np.asarray(american, dtype=bool)
+    n = len(S)
+    n_workers = min(n_workers, n)
+
+    bounds = np.linspace(0, n, n_workers + 1, dtype=int)
+    chunks = [
+        (S[bounds[i]:bounds[i+1]], K[bounds[i]:bounds[i+1]], T[bounds[i]:bounds[i+1]],
+         r[bounds[i]:bounds[i+1]], sigma[bounds[i]:bounds[i+1]], kind[bounds[i]:bounds[i+1]],
+         american[bounds[i]:bounds[i+1]], n_steps, n_space)
+        for i in range(n_workers) if bounds[i + 1] > bounds[i]
+    ]
+
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        results = list(executor.map(_pde_chunk, chunks))
+
+    return np.concatenate(results)
+
+
+def pde_crank_nicolson_auto(S, K, T, r, sigma, kind, american, n_steps=200, n_space=200,
+                             n_workers=8, min_parallel_seconds=2.0):
+    """Price tout un book en PDE, en choisissant séquentiel vs parallèle
+    automatiquement selon le coût RÉEL mesuré — pas un cas particulier sur
+    (n_steps, n_space). Sonde le coût d'une option à cette résolution, en
+    déduit le temps séquentiel total estimé, et ne parallélise que s'il
+    dépasse largement le coût de démarrage des process (mesuré ~0.4s/worker
+    sous Windows, cf. commentaire ci-dessus) : `min_parallel_seconds` fixe la
+    marge de sécurité en dessous de laquelle rester séquentiel est toujours
+    plus rapide. À appeler sous une garde `if __name__ == "__main__":` si le
+    chemin parallèle finit par être choisi (contrainte multiprocessing sous
+    Windows)."""
+    S, K, T, r, sigma = (np.asarray(x, dtype=float) for x in (S, K, T, r, sigma))
+    kind = np.asarray(kind)
+    american = np.asarray(american, dtype=bool)
+    n = len(S)
+    if n == 0:
+        return np.array([])
+
+    probe_opt = Option(S=S[0], K=K[0], T=T[0], r=r[0], sigma=sigma[0], kind=kind[0])
+    probe_style = 'american' if american[0] else 'european'
+    t0 = time.perf_counter()
+    first_price = pde_crank_nicolson(probe_opt, style=probe_style, n_steps=n_steps, n_space=n_space)
+    cost_per_option = time.perf_counter() - t0
+    est_sequential_time = cost_per_option * n
+
+    if n < 2 or est_sequential_time < min_parallel_seconds:
+        prices = np.empty(n)
+        prices[0] = first_price
+        for i in range(1, n):
+            opt = Option(S=S[i], K=K[i], T=T[i], r=r[i], sigma=sigma[i], kind=kind[i])
+            style = 'american' if american[i] else 'european'
+            prices[i] = pde_crank_nicolson(opt, style=style, n_steps=n_steps, n_space=n_space)
+        return prices
+
+    return pde_crank_nicolson_parallel(S, K, T, r, sigma, kind, american,
+                                        n_steps=n_steps, n_space=n_space, n_workers=n_workers)
 
 
 if __name__ == "__main__":
@@ -232,7 +338,7 @@ if __name__ == "__main__":
     plt.show()
 
     # =============================================================================
-    # - Validation multi-cas : book européen complet (options_benchmark.xlsx) ---
+    # - Validation multi-cas : book européen complet (book PARAMS) ---
     # =============================================================================
     # Tout ce qui précède ne teste qu'un seul cas (put ATM, T=1). Les paramètres
     # "optimaux" trouvés ne sont valables que pour ce cas précis : un schéma aux
@@ -262,7 +368,10 @@ if __name__ == "__main__":
     MAX_THRESHOLD_BOOK_RELAXED = 0.40  # $0.40 — seuil relâché : un regroupement de configs passe
                                         # sous ce niveau alors qu'aucune ne passe sous $0.22
 
-    book_raw = pd.read_excel(DATA / "options_benchmark.xlsx", sheet_name=0, header=2, index_col=0)
+    # Book PARAMS (pas le book test) : ce bloc calibre n_steps/n_space, comme
+    # benchmarkMethods.py — cf. commentaire en tête de benchmarkInData.py pour
+    # la séparation params/test.
+    book_raw = pd.read_excel(DATA / "1_options_book_params_2026-06-29.xlsx", sheet_name=0, header=2, index_col=0)
     book = book_raw[book_raw["Style"] != "American"]
     book = book[["Kind", "Spot  S", "Strike  K", "T  (years)", "Rate  r (%)", "Vol  σ (%)"]]
     print(f"\n--- Validation sur book europeen complet ({len(book)} options, toutes vols) ---")

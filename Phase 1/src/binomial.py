@@ -12,7 +12,10 @@ def crr_price(option: Option, period: int, american: bool = False, verbose: bool
 
     # Tableau triangulaire des prix S(i,j) pour i=0..period, j=0..i
     # On stocke tout dans des listes de tableaux NumPy (une ligne par étape i)
-    S_tree = [option.S * (u ** np.arange(i + 1)) * (d ** (i - np.arange(i + 1)))
+    # u^j * d^(i-j) = u^j * u^-(i-j) = u^(2j-i) puisque d=1/u : une seule
+    # opération de puissance au lieu de deux (+ une multiplication évitée) —
+    # c'est cette opération qui domine le coût quand period grandit.
+    S_tree = [option.S * (u ** (2 * np.arange(i + 1) - i))
               for i in range(period + 1)]
 
     # Valeurs terminales (vectorisé)
@@ -54,6 +57,55 @@ def crr_price(option: Option, period: int, american: bool = False, verbose: bool
         print_tree_visual(tree, calc_tree, S_tree, p, disc, period, option, american)
 
     return float(tree[0][0])
+
+
+def crr_price_fast(S, K, T, r, sigma, kind, american, period: int) -> np.ndarray:
+    """Prix CRR (binomial) vectorisé sur tout un book, à `period` fixe partagé.
+
+    S/K/T/r/sigma : array-like, shape (n_options,).
+    kind : array-like de 'call'/'put'. american : array-like de bool (True =
+    style américain pour cette ligne, mélange possible dans le même appel).
+    Retourne un array de prix, shape (n_options,).
+
+    Contrairement aux versions "fast" de monteCarlo.py, ici le batching à
+    travers les options aide réellement (vérifié empiriquement, pas supposé) :
+    la largeur des matrices est `period` (<=1000 dans nos balayages), pas
+    n_paths (100000) — même à 2000 options, une matrice (2000, 1000) ne pèse
+    que ~16 Mo, largement dans la zone où NumPy reste efficace, contrairement
+    au cas Monte Carlo où (n_options, n_paths) explosait le cache L3 dès 2
+    options groupées. La boucle sur `period` reste séquentielle (induction
+    rétrograde), mais chaque étape traite maintenant TOUTES les options d'un
+    coup au lieu d'une boucle Python par option — le nombre d'itérations
+    Python passe de (n_options x period) à seulement `period`.
+    """
+    S, K, T, r, sigma = (np.asarray(x, dtype=float) for x in (S, K, T, r, sigma))
+    sign = np.where(np.asarray(kind) == 'call', 1.0, -1.0)
+    american = np.asarray(american, dtype=bool)[:, None]
+
+    dt = T / period
+    u = np.exp(sigma * np.sqrt(dt))
+    d = 1.0 / u
+    p = (np.exp(r * dt) - d) / (u - d)
+    disc = np.exp(-r * dt)
+
+    # u^j * d^(i-j) = u^(2j-i) puisque d=1/u : une seule puissance au lieu de
+    # deux (+ une multiplication évitée), à chaque étape — c'est cette
+    # opération qui domine le coût quand period grandit, cf. crr_price.
+    j = np.arange(period + 1)
+    S_T = S[:, None] * (u[:, None] ** (2 * j - period)[None, :])
+    values = np.maximum(sign[:, None] * (S_T - K[:, None]), 0.0)
+
+    for i in range(period - 1, -1, -1):
+        v_up, v_down = values[:, 1:i + 2], values[:, 0:i + 1]
+        continuation = disc[:, None] * (p[:, None] * v_up + (1 - p[:, None]) * v_down)
+
+        j = np.arange(i + 1)
+        S_i = S[:, None] * (u[:, None] ** (2 * j - i)[None, :])
+        intrinsic = np.maximum(sign[:, None] * (S_i - K[:, None]), 0.0)
+
+        values = np.where(american, np.maximum(continuation, intrinsic), continuation)
+
+    return values[:, 0]
 
 
 def print_tree_visual(tree, calc_tree, S_tree, p, disc, period, option, american):

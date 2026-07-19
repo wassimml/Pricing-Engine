@@ -11,7 +11,7 @@ Personal project built alongside a derivatives course (Ensimag 2A), drawing on *
 | Phase | Content | Status |
 |-------|---------|--------|
 | **Phase 1** | Black-Scholes, Greeks, CRR, Monte Carlo & PDE | In progress |
-| **Phase 2** | Stochastic Volatility - Heston & SABR | Coming soon |
+| **Phase 2** | Stochastic Volatility - Heston & SABR | In progress |
 | **Phase 3** | Stochastic Interest Rates - Vasicek, CIR & SVSI | Coming soon |
 | **Phase 4** | Vol Surface Arbitrage Lab | Coming soon |
 
@@ -28,10 +28,10 @@ Implementation of the foundations of vanilla option pricing.
 - CRR Binomial tree
 - Longstaff-Schwartz LSM - order-3 polynomial regression
 - PDE - Crank-Nicolson
-- Implied volatility via Newton-Raphson 
-- BS / MC / LSM / CRR / PDE benchmark on real SPY data **(In progress)**
+- Implied volatility inversion via Brent's method - BS, CRR, LSM & PDE, with smile and 3D surface on real AAPL data
+- LSM / CRR / PDE (American) vs BS baseline, benchmarked on real SPY market data
 
-## Phase 2 - Stochastic Volatility *(coming soon)*
+## Phase 2 - Stochastic Volatility
 
 Extension towards non-constant volatility models.
 
@@ -109,6 +109,7 @@ Options Pricing Engine/
 │   │   ├── impliedVol.py        # Implied vol inversion (BS/CRR/LSM/PDE) + smile & surface (AAPL)
 │   │   ├── timeValue.py         # Time value study (BS, spot x maturity 3D surface)
 │   │   ├── benchmarkMethods.py  # Accuracy/speed vs parameter sweep (3D)
+│   │   ├── generateOptionsBook.py # Generate the reproducible ~2000-option synthetic book
 │   │   ├── benchmarkInData.py   # Benchmark all methods on ~2000 synthetic options
 │   │   ├── benchmarkSPY.py      # Benchmark LSM/CRR/PDE vs real SPY market data
 │   │   ├── makeSnapshotSPY.py   # Generate a reproducible SPY options snapshot
