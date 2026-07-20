@@ -20,6 +20,21 @@ _bs = BSModel()
 N_SEEDS = 10    # répétitions indépendantes par (méthode, paramètre) — cf. run_method
 BASE_SEED = 0
 
+def _derive_seed(base_seed: int, p, s: int) -> int:
+    """Dérive un seed reproductible mais statistiquement indépendant pour
+    chaque (paramètre p, répétition s) — PAS des nombres aléatoires communs.
+
+    Avec `seed = base_seed + s` (ancienne version), tous les p au même s
+    démarraient le même flux aléatoire, qui restait aligné exactement le
+    temps de consommer autant de tirages que la config la plus courte
+    (vérifié empiriquement : identique au premier pas de temps / à la
+    première option, brisé dès le suivant) — ni un vrai common-random-numbers
+    (qui resterait aligné du début à la fin), ni des tirages réellement
+    indépendants. SeedSequence([base_seed, p, s]) mélange les trois valeurs
+    pour produire un seed different et non corrélé par (p, s), tout en
+    restant déterministe (même triplet -> même seed à chaque run)."""
+    return int(np.random.SeedSequence([base_seed, p, s]).generate_state(1)[0])
+
 # Each entry: (kind, pricer, param values, style_filter, ref_kind, stochastic).
 # kind = "fast" (pricer array-based : vectorisé pour BS/MC/CRR, parallélisé
 # sur plusieurs process pour LSM — cf. monteCarlo.py/binomial.py/
@@ -72,7 +87,7 @@ def run_method(cleanData: pd.DataFrame, pricer, params: list, style_filter, ref:
     for p in params:
         seed_times, seed_maes = [], []
         for s in range(effective_seeds):
-            seed = base_seed + s
+            seed = _derive_seed(base_seed, p, s)
             t0 = time.perf_counter()
             prices = np.array([
                 pricer(Option(S=row[2], K=row[3], T=row[4], r=row[5]/100, sigma=row[6]/100, kind=row[1].lower()),
@@ -104,7 +119,7 @@ def run_method_fast(cleanData: pd.DataFrame, pricer_fast, params: list, style_fi
     for p in params:
         seed_times, seed_maes = [], []
         for s in range(effective_seeds):
-            seed = base_seed + s
+            seed = _derive_seed(base_seed, p, s)
             t0 = time.perf_counter()
             prices = pricer_fast(S, K, T, r, sigma, kind, american, p, seed)
             elapsed = time.perf_counter() - t0

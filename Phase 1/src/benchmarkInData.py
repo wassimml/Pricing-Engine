@@ -39,12 +39,14 @@ _bs = BSModel()
 # appliquer.
 def _lsm_prices(S, K, T, r, sigma, kind, american):
     """lsm n'a de sens que sur les lignes américaines (early exercise) ; NaN
-    ailleurs, comme le faisait l'ancienne version row-based (`else None`)."""
+    ailleurs, comme le faisait l'ancienne version row-based (`else None`).
+    n_paths=5000 : paramètre retenu sous contrainte de latence 10s sur un
+    book de 2000 options (cf. tableau de sélection des paramètres)."""
     prices = np.full(len(S), np.nan)
     if american.any():
         prices[american] = LSMoptionValue_parallel(
             S[american], K[american], T[american], r[american], sigma[american], kind[american],
-            n_steps=50, n_paths=20000, seed=42, n_workers=8)
+            n_steps=50, n_paths=5000, seed=42, n_workers=8)
     return prices
 
 def _bs_lsm_prices(S, K, T, r, sigma, kind, american):
@@ -54,7 +56,7 @@ def _bs_lsm_prices(S, K, T, r, sigma, kind, american):
         prices = prices.copy()
         prices[american] = LSMoptionValue_parallel(
             S[american], K[american], T[american], r[american], sigma[american], kind[american],
-            n_steps=50, n_paths=20000, seed=42, n_workers=8)
+            n_steps=50, n_paths=5000, seed=42, n_workers=8)
     return prices
 
 # PDE (50,100) [outil de CALCUL] et PDE (800,800) [outil de RÉFÉRENCE] passent
@@ -81,13 +83,15 @@ def _bs_pde_prices(n_steps, n_space):
     return _inner
 
 FAST_PRICERS = {
+    # Paramètres retenus sous contrainte de latence 10s sur un book de 2000
+    # options (cf. tableau de sélection des paramètres, book PARAMS).
     "BS":            lambda S, K, T, r, sigma, kind, american: _bs.price_batch(S, K, T, r, sigma, kind),
     "MC Naive":      lambda S, K, T, r, sigma, kind, american: mc_naive_threaded(S, K, T, r, sigma, kind, n_paths=100000, seed=42, n_workers=8)[0],
-    "MC Anti":       lambda S, K, T, r, sigma, kind, american: mc_antithetic_threaded(S, K, T, r, sigma, kind, n_paths=100000, seed=42, n_workers=8)[0],
-    "MC Contr":      lambda S, K, T, r, sigma, kind, american: mc_control_threaded(S, K, T, r, sigma, kind, n_paths=100000, seed=42, n_workers=8)[0],
-    "MC Anti Contr": lambda S, K, T, r, sigma, kind, american: mc_control_antithetic_threaded(S, K, T, r, sigma, kind, n_paths=50000, seed=42, n_workers=8)[0],
-    "crr":           lambda S, K, T, r, sigma, kind, american: crr_price_fast(S, K, T, r, sigma, kind, american, period=200),
-    "BS,crr":        lambda S, K, T, r, sigma, kind, american: np.where(american, crr_price_fast(S, K, T, r, sigma, kind, american, period=200), _bs.price_batch(S, K, T, r, sigma, kind)),
+    "MC Anti":       lambda S, K, T, r, sigma, kind, american: mc_antithetic_threaded(S, K, T, r, sigma, kind, n_paths=200000, seed=42, n_workers=8)[0],
+    "MC Contr":      lambda S, K, T, r, sigma, kind, american: mc_control_threaded(S, K, T, r, sigma, kind, n_paths=200000, seed=42, n_workers=8)[0],
+    "MC Anti Contr": lambda S, K, T, r, sigma, kind, american: mc_control_antithetic_threaded(S, K, T, r, sigma, kind, n_paths=200000, seed=42, n_workers=8)[0],
+    "crr":           lambda S, K, T, r, sigma, kind, american: crr_price_fast(S, K, T, r, sigma, kind, american, period=500),
+    "BS,crr":        lambda S, K, T, r, sigma, kind, american: np.where(american, crr_price_fast(S, K, T, r, sigma, kind, american, period=500), _bs.price_batch(S, K, T, r, sigma, kind)),
     "lsm":           _lsm_prices,
     "BS,lsm":        _bs_lsm_prices,
     "PDE (50,100)":     _pde_prices(50, 100),
@@ -149,17 +153,21 @@ def plot_figure(title, methods, data_subset, ref, ref_label, bar_color, filename
     x_mae  = np.arange(len(mae_methods))
     _, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
 
-    ax1.bar(x_time, [times[m] for m in methods], color=bar_color, edgecolor="white")
+    bars1 = ax1.bar(x_time, [times[m] for m in methods], color=bar_color, edgecolor="white")
     ax1.set_ylabel("Total time (s)")
     ax1.set_title(f"{title} — Execution time")
     ax1.set_xticks(x_time)
     ax1.set_xticklabels(methods, rotation=30, ha="right")
+    ax1.margins(y=0.12)
+    ax1.bar_label(bars1, fmt="%.2fs", padding=3, fontsize=8)
 
-    ax2.bar(x_mae, [maes[m] for m in mae_methods], color="tomato", edgecolor="white")
+    bars2 = ax2.bar(x_mae, [maes[m] for m in mae_methods], color="tomato", edgecolor="white")
     ax2.set_ylabel(f"MAE vs {ref_label} (€)")
     ax2.set_title(f"{title} — Mean Absolute Error vs {ref_label}")
     ax2.set_xticks(x_mae)
     ax2.set_xticklabels(mae_methods, rotation=30, ha="right")
+    ax2.margins(y=0.12)
+    ax2.bar_label(bars2, fmt="%.4f", padding=3, fontsize=8)
 
     plt.tight_layout()
     plt.savefig(REPORTS / filename, dpi=150)
