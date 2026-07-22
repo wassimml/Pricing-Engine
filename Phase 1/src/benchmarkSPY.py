@@ -19,7 +19,7 @@ REPORTS = Path(__file__).parent.parent / "reports"
 
 # Snapshot figé de la chaîne d'options SPY (filtrée), généré une fois puis
 # rejoué à chaque run pour comparer les méthodes sur des données identiques.
-SNAPSHOT_PATH = DATA / "SPY_options_2026-07-16.csv"
+SNAPSHOT_PATH = DATA / "SPY_options_2026-07-22.csv"
 
 _bs = BSModel()
 
@@ -36,11 +36,10 @@ _bs = BSModel()
 # contre le prix marché - contrairement à benchmarkMethods.py où PDE ne joue
 # jamais que le rôle de référence pour CRR/LSM.
 #
-# CRR (period=500) et LSM (n_steps=50, n_paths=5000) utilisent les paramètres
-# retenus sous contrainte de latence 10s sur le book PARAMS (cf. tableau de
-# sélection des paramètres) - les mêmes que benchmarkInData.py. LSM ne
-# comparait auparavant deux configs (10000 vs 20000 paths) à titre exploratoire
-# ; remplacé par la config unique retenue, cohérent avec le reste du projet.
+# CRR (period=200) et LSM (n_steps=25, n_paths=10000) utilisent les paramètres
+# retenus par la procédure sous budget de temps de benchmarkMethods.py (2s
+# pour CRR, 10s pour LSM - dichotomie + Pareto + indifférence statistique,
+# cf. ce fichier pour le détail) - les mêmes que benchmarkInData.py.
 AMERICANMETHODS = ["LSM", "CRR", "PDE (50,100)", "PDE (800,800)"]
 
 # LSM est la seule méthode stochastique du book réel (CRR/PDE sont
@@ -126,7 +125,7 @@ if __name__ == "__main__":
 
     print("Pricing CRR...")
     t0 = time.perf_counter()
-    df["price_CRR"] = crr_price_fast(S_arr, K_arr, T_arr, r_arr, sigma_arr, kind_arr, american_arr, period=500)
+    df["price_CRR"] = crr_price_fast(S_arr, K_arr, T_arr, r_arr, sigma_arr, kind_arr, american_arr, period=200)
     timings["CRR"] = time.perf_counter() - t0
 
     print(f"Pricing LSM ({N_SEEDS_LSM} seeds indépendants)...")
@@ -136,7 +135,7 @@ if __name__ == "__main__":
         seed = _derive_seed(BASE_SEED_LSM, s)
         t0 = time.perf_counter()
         lsm_prices_by_seed[s] = LSMoptionValue_parallel(
-            S_arr, K_arr, T_arr, r_arr, sigma_arr, kind_arr, n_steps=50, n_paths=5000, seed=seed)
+            S_arr, K_arr, T_arr, r_arr, sigma_arr, kind_arr, n_steps=25, n_paths=10000, seed=seed)
         lsm_seed_times[s] = time.perf_counter() - t0
     timings["LSM"] = lsm_seed_times.sum()
     timings["LSM_per_seed_mean"] = lsm_seed_times.mean()

@@ -41,17 +41,25 @@ if __name__ == "__main__":
     raw["mid"] = (raw["bid"] + raw["ask"]) / 2
 
     # - Filtres -------------------------------------------------------------
+    # Chaque étape imprime combien d'options elle écarte (pas seulement le
+    # compte cumulé restant) - un "funnel" récapitulatif est aussi affiché à
+    # la fin (cf. section suivante), utile pour quantifier l'effet de chaque
+    # filtre pris isolément dans le rapport.
     df = raw.copy()
-    print("Initial :", len(df))
+    print(f"Initial : {len(df)}")
+    funnel = [("Initial", len(df), len(df))]
 
-    df = df[(df["bid"] > 0) & (df["ask"] > 0)]
-    print("bid/ask >", len(df))
+    def apply_filter(df, mask, label):
+        n_before = len(df)
+        df = df[mask]
+        n_after = len(df)
+        print(f"{label} : {n_after}  (-{n_before - n_after} ecartees)")
+        funnel.append((label, n_before, n_after))
+        return df
 
-    df = df[df["T"] > 7/365]
-    print("T >", len(df))
-
-    df = df[(df["impliedVolatility"] > 0) & df["impliedVolatility"].notna()]
-    print("IV >", len(df))
+    df = apply_filter(df, (df["bid"] > 0) & (df["ask"] > 0), "bid/ask > 0")
+    df = apply_filter(df, df["T"] > 7/365, "T > 7j")
+    df = apply_filter(df, (df["impliedVolatility"] > 0) & df["impliedVolatility"].notna(), "IV renseignee")
 
     disc_K = df["strike"] * np.exp(-r * df["T"])
     lb = np.where(
@@ -59,14 +67,10 @@ if __name__ == "__main__":
         np.maximum(S - disc_K, 0),
         np.maximum(disc_K - S, 0),
     )
-    df = df[df["mid"] >= lb]
-    print("No-arbitrage >", len(df))
+    df = apply_filter(df, df["mid"] >= lb, "No-arbitrage (mid >= borne inf.)")
 
-    df = df[
-        (df.impliedVolatility > 0.05) &
-        (df.impliedVolatility < 2.0)
-    ]
-    print("IV bounds >", len(df))
+    df = apply_filter(
+        df, (df.impliedVolatility > 0.05) & (df.impliedVolatility < 2.0), "IV bounds (0.05-2.0)")
 
     # - Filtre : liquidité minimale (open interest) ----------------------------
     # Sans ce filtre, des contrats à openInterest=0 (jamais tradés) se glissent
@@ -74,9 +78,22 @@ if __name__ == "__main__":
     # marché réel, et ce sont eux qui dominent le MAE/RMSE des méthodes de
     # pricing (cf. review du rapport Benchmark, section 2.7.2 — le point isolé
     # de la Figure 7 était un put K=1350, T=2.44 ans, openInterest=0).
-    n_before = len(df)
-    df = df[df["openInterest"].fillna(0) >= 10]
-    print(f"Open interest >= 10 > {len(df)}  ({n_before - len(df)} écartées)")
+    df = apply_filter(df, df["openInterest"].fillna(0) >= 10, "Open interest >= 10")
+
+    # - Recap (funnel) ----------------------------------------------------------
+    # Note : print() reste ASCII-safe (pas d'accent) - la console Windows par
+    # defaut (cp1252) affiche du charabia sinon (cf. meme convention deja
+    # etablie dans benchmarkSPY.py).
+    print("\n- Recapitulatif des filtres (funnel) -")
+    for label, n_before, n_after in funnel:
+        if label == "Initial":
+            print(f"  {label:32}: {n_after:5d}")
+        else:
+            pct = (n_before - n_after) / n_before * 100 if n_before else 0.0
+            print(f"  {label:32}: {n_after:5d}  (-{n_before - n_after:4d}, -{pct:.1f}%)")
+    total_before, total_after = funnel[0][2], funnel[-1][2]
+    print(f"  {'Total':32}: {total_after:5d}  (-{total_before - total_after:4d}, "
+          f"-{(total_before - total_after) / total_before * 100:.1f}% du book initial)")
 
     # - Moneyness -------------------------------------------------------------
     m_ratio = df["strike"] / S
@@ -89,5 +106,5 @@ if __name__ == "__main__":
     # - Sauvegarde --------------------------------------------------------------
     snapshot_path = DATA / f"SPY_options_{today.date()}.csv"
     df.to_csv(snapshot_path, index=False)
-    print(f"Snapshot sauvegardé ({len(df)} lignes) : {snapshot_path}")
-    print("Pense à mettre à jour SNAPSHOT_PATH dans benchmarkSPY.py.")
+    print(f"Snapshot sauvegarde ({len(df)} lignes) : {snapshot_path}")
+    print("Pense a mettre a jour SNAPSHOT_PATH dans benchmarkSPY.py.")
